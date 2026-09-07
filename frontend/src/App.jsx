@@ -5,7 +5,7 @@ import Login from './Login';
 import { auth, signOut, onAuthStateChanged } from './firebase';
 
 function App() {
-  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(window.innerWidth > 768);
   const [currentSessionId, setCurrentSessionId] = useState(`session_${Date.now()}`);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   
@@ -39,7 +39,12 @@ function App() {
   }, []);
 
   const handleSignOut = () => signOut(auth);
-  const startNewChat = () => setCurrentSessionId(`session_${Date.now()}`);
+  const startNewChat = () => {
+    setCurrentSessionId(`session_${Date.now()}`);
+    if (window.innerWidth <= 768) {
+      setIsSidebarOpen(false);
+    }
+  };
 
   if (authLoading) {
     return (
@@ -66,19 +71,6 @@ function App() {
       <div className={`${isSidebarOpen ? 'w-[280px]' : 'w-0'} absolute md:relative z-30 h-full bg-[var(--bg-surface)] transition-all duration-300 ease-in-out flex flex-col shrink-0 border-r border-[var(--border-color)] overflow-hidden`}>
         <div className="p-4 flex-1 flex flex-col h-full w-[280px]">
           
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-2 text-[var(--text-primary)] cursor-pointer" onClick={startNewChat}>
-              <Scale className="text-blue-400 shrink-0" size={24} />
-              <h1 className="text-xl font-medium tracking-wide">LegalView</h1>
-            </div>
-            <button 
-              onClick={() => setIsSidebarOpen(false)}
-              className="p-2 hover:bg-[var(--bg-surface-hover)] rounded-full transition-colors text-[var(--text-secondary)] hover:text-[var(--text-primary)] cursor-pointer"
-            >
-              <ArrowLeft size={24} />
-            </button>
-          </div>
-
           <button 
             onClick={startNewChat}
             className="cursor-pointer flex items-center gap-3 bg-[var(--bg-surface-hover)] hover:bg-[var(--bg-surface-hover)] text-sm font-medium py-3 px-4 rounded-full transition-colors w-full mb-6 mt-2 border border-[var(--border-color)]"
@@ -92,6 +84,7 @@ function App() {
             setCurrentSessionId={setCurrentSessionId} 
             refreshTrigger={refreshTrigger}
             token={token}
+            setIsSidebarOpen={setIsSidebarOpen}
           />
         </div>
 
@@ -130,22 +123,20 @@ function App() {
           </button>
         </div>
         
-        {/* Fixed Navbar (Only shows hamburger when sidebar is closed) */}
+        {/* Fixed Navbar (Always shows hamburger) */}
         <header className="h-16 flex items-center px-4 shrink-0 z-10 bg-[var(--bg-main)]">
-          {!isSidebarOpen && (
-            <div className="flex items-center gap-4">
-              <button 
-                onClick={() => setIsSidebarOpen(true)}
-                className="cursor-pointer p-2 hover:bg-[var(--bg-surface-hover)] rounded-full transition-colors text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
-              >
-                <Menu size={24} />
-              </button>
-              <div className="flex items-center gap-2 text-[var(--text-primary)] cursor-pointer" onClick={startNewChat}>
-                <Scale className="text-blue-400 shrink-0" size={24} />
-                <h1 className="text-xl font-medium tracking-wide">LegalView</h1>
-              </div>
+          <div className="flex items-center gap-4">
+            <button 
+              onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+              className="cursor-pointer p-2 hover:bg-[var(--bg-surface-hover)] rounded-full transition-colors text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+            >
+              <Menu size={24} />
+            </button>
+            <div className="flex items-center gap-2 text-[var(--text-primary)] cursor-pointer" onClick={startNewChat}>
+              <Scale className="text-blue-400 shrink-0" size={24} />
+              <h1 className="text-xl font-medium tracking-wide">LegalView</h1>
             </div>
-          )}
+          </div>
         </header>
 
         {/* Chat Area (Scrollable body, fixed footer) */}
@@ -164,7 +155,7 @@ function App() {
 // ==========================================
 // Sidebar History List Component
 // ==========================================
-function SidebarHistoryList({ currentSessionId, setCurrentSessionId, refreshTrigger, token }) {
+function SidebarHistoryList({ currentSessionId, setCurrentSessionId, refreshTrigger, token, setIsSidebarOpen }) {
   const [historySessions, setHistorySessions] = useState([]);
   const [editingId, setEditingId] = useState(null);
   const [editTitle, setEditTitle] = useState("");
@@ -184,7 +175,12 @@ function SidebarHistoryList({ currentSessionId, setCurrentSessionId, refreshTrig
     fetchSessions();
   }, [refreshTrigger, token]);
 
-  const loadPastSession = (id) => setCurrentSessionId(id);
+  const loadPastSession = (id) => {
+    setCurrentSessionId(id);
+    if (window.innerWidth <= 768) {
+      setIsSidebarOpen(false);
+    }
+  };
 
   const deleteSession = (e, id) => {
     e.stopPropagation();
