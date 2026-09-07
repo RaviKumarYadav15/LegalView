@@ -1,0 +1,55 @@
+﻿@import "tailwindcss";
+
+@theme {
+  --color-*: initial;
+}
+
+@layer base {
+  :root {
+    --bg-main: #FFFFFF;
+    --bg-surface: #F3F4F6;
+    --bg-surface-hover: #E5E7EB;
+    
+    --border-color: #D1D5DB;
+    
+    --text-primary: #111827;
+    --text-secondary: #4B5563;
+    
+    --btn-primary-bg: #111827;
+    --btn-primary-text: #FFFFFF;
+    --btn-primary-hover: #374151;
+  }
+
+  .dark {
+    --bg-main: #131314;
+    --bg-surface: #1E1F20;
+    --bg-surface-hover: #282A2C;
+    
+    --border-color: #333537;
+    
+    --text-primary: #E3E3E3;
+    --text-secondary: #9ca3af;
+    
+    --btn-primary-bg: #E3E3E3;
+    --btn-primary-text: #000000;
+    --btn-primary-hover: #FFFFFF;
+  }
+
+  body {
+    background-color: var(--bg-main);
+    color: var(--text-primary);
+  }
+}
+
+@layer utilities {
+  .typing-indicator span {
+    animation: bounce 1.4s infinite ease-in-out both;
+  }
+  .typing-indicator span:nth-child(1) { animation-delay: -0.32s; }
+  .typing-indicator span:nth-child(2) { animation-delay: -0.16s; }
+  
+  @keyframes bounce {
+    0%, 80%, 100% { transform: scale(0); }
+    40% { transform: scale(1); }
+  }
+}

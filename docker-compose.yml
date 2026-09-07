@@ -1,0 +1,34 @@
+version: "3.8"
+services:
+  api:
+    build: ./backend
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./backend:/app
+    environment:
+      - CHROMA_PERSIST_DIR=/app/data/chroma_db
+      - RAW_PDF_DIR=/app/data/raw_pdfs
+      - REDIS_URL=redis://redis:6379
+    env_file:
+      - ./backend/.env
+    command: ["uvicorn", "src.api.main:app", "--host", "0.0.0.0", "--port", "8000"]
+    depends_on:
+      - redis
+
+  redis:
+    image: redis:latest
+    ports:
+      - "6379:6379"
+
+  frontend:
+    build:
+      context: ./frontend
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    command: ["npm", "run", "dev", "--", "--host"]
+    depends_on:
+      - api

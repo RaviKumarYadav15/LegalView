@@ -1,0 +1,10 @@
+
+.venv/
+__pycache__/
+*.pyc
+.env
+data/raw_pdfs/*
+data/chroma_db/*
+!data/raw_pdfs/.gitkeep
+!data/chroma_db/.gitkeep
+

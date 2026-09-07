@@ -1,0 +1,15 @@
+fastapi
+uvicorn
+langchain
+langchain-community
+langchain-chroma
+chromadb
+rank_bm25
+sentence-transformers
+pypdf
+python-dotenv
+pydantic
+pydantic-settings
+python-multipart
+requests
+firebase-admin==6.5.0

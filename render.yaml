@@ -1,0 +1,23 @@
+﻿services:
+  - type: web
+    name: legalview-backend
+    env: python
+    rootDir: backend
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn src.api.main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.0
+      - key: PORT
+        value: 10000
+      - key: CHROMA_PERSIST_DIR
+        value: /opt/render/project/src/backend/data/chroma_db
+      - key: RAW_PDF_DIR
+        value: /opt/render/project/src/backend/data/raw_pdfs
+      # The following variables must be manually pasted into the Render Dashboard!
+      - key: GOOGLE_API_KEY
+        sync: false
+      - key: REDIS_URL
+        sync: false
+      - key: FIREBASE_SERVICE_ACCOUNT_JSON
+        sync: false
