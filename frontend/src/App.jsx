@@ -52,10 +52,18 @@ function App() {
   if (!user || !token) return <Login isDark={isDark} setIsDark={setIsDark} />;
 
   return (
-    <div className="flex h-screen bg-[var(--bg-main)] text-[var(--text-primary)] font-sans overflow-hidden">
+    <div className="flex h-screen bg-[var(--bg-main)] text-[var(--text-primary)] font-sans overflow-hidden relative">
       
+      {/* Mobile Overlay */}
+      {isSidebarOpen && (
+        <div 
+          className="fixed inset-0 bg-black/40 z-20 md:hidden" 
+          onClick={() => setIsSidebarOpen(false)}
+        />
+      )}
+
       {/* Sidebar */}
-      <div className={`${isSidebarOpen ? 'w-[280px]' : 'w-0'} bg-[var(--bg-surface)] transition-all duration-300 ease-in-out flex flex-col shrink-0 border-r border-[var(--border-color)] overflow-hidden`}>
+      <div className={`${isSidebarOpen ? 'w-[280px]' : 'w-0'} absolute md:relative z-30 h-full bg-[var(--bg-surface)] transition-all duration-300 ease-in-out flex flex-col shrink-0 border-r border-[var(--border-color)] overflow-hidden`}>
         <div className="p-4 flex-1 flex flex-col h-full w-[280px]">
           
           <div className="flex items-center justify-between mb-4">
