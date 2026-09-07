@@ -270,7 +270,7 @@ function SidebarHistoryList({ currentSessionId, setCurrentSessionId, refreshTrig
                   <MessageSquare size={16} className={`shrink-0 ${currentSessionId === session.id ? 'text-blue-400' : 'group-hover:text-[var(--text-secondary)]'}`} />
                   <span className="truncate text-left pr-14">{session.title}</span>
                 </button>
-                <div className="absolute right-2 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all">
+                <div className="absolute right-2 flex items-center gap-1 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-all">
                   <button 
                     onClick={(e) => {
                       e.stopPropagation();
@@ -521,14 +521,14 @@ function CitationAccordion({ sources }) {
       {isOpen && (
         <div className="p-4 grid gap-3 border-t border-[var(--border-color)] bg-[var(--bg-surface)]">
           {sources.map((src, idx) => (
-            <div key={idx} className="bg-[var(--bg-main)] border border-[var(--border-color)] rounded-xl p-4">
-              <div className="flex justify-between items-start mb-2">
-                <span className="text-xs font-bold text-blue-400">Match: {(src.score * 100).toFixed(1)}%</span>
-                <span className="text-xs font-medium text-[var(--text-secondary)] bg-[var(--bg-surface-hover)] px-2.5 py-1 rounded-md max-w-[70%] truncate">
-                  {src.source} (Pg {src.page}) {src.legal_meta ? `• ${src.legal_meta}` : ""}
+            <div key={idx} className="bg-[var(--bg-main)] border border-[var(--border-color)] rounded-xl p-4 overflow-hidden">
+              <div className="flex flex-col md:flex-row md:justify-between items-start mb-3 gap-2">
+                <span className="text-xs font-bold text-blue-400 shrink-0">Match: {(src.score * 100).toFixed(1)}%</span>
+                <span className="text-xs font-medium text-[var(--text-secondary)] bg-[var(--bg-surface-hover)] px-2.5 py-1 rounded-md break-words whitespace-pre-wrap max-w-full">
+                  {src.source} (Pg {src.page}) {src.legal_meta ? `— ${src.legal_meta}` : ""}
                 </span>
               </div>
-              <p className="text-sm text-[var(--text-secondary)] line-clamp-2 leading-relaxed">{src.text}</p>
+              <p className="text-sm text-[var(--text-secondary)] leading-relaxed break-words whitespace-pre-wrap">{src.text}</p>
             </div>
           ))}
         </div>
