@@ -57,97 +57,100 @@ function App() {
   if (!user || !token) return <Login isDark={isDark} setIsDark={setIsDark} />;
 
   return (
-    <div className="flex h-screen bg-[var(--bg-main)] text-[var(--text-primary)] font-sans overflow-hidden relative">
+    <div className="flex flex-col h-screen bg-[var(--bg-main)] text-[var(--text-primary)] font-sans overflow-hidden relative">
       
-      {/* Mobile Overlay */}
-      {isSidebarOpen && (
-        <div 
-          className="fixed inset-0 bg-black/40 z-20 md:hidden" 
-          onClick={() => setIsSidebarOpen(false)}
-        />
-      )}
-
-      {/* Sidebar */}
-      <div className={`${isSidebarOpen ? 'w-[280px]' : 'w-0'} absolute md:relative z-30 h-full bg-[var(--bg-surface)] transition-all duration-300 ease-in-out flex flex-col shrink-0 border-r border-[var(--border-color)] overflow-hidden`}>
-        <div className="p-4 flex-1 flex flex-col h-full w-[280px]">
-          
+      {/* Fixed Top Navbar (Always shows hamburger) */}
+      <header className="h-16 flex items-center px-4 shrink-0 z-40 bg-[var(--bg-main)] border-b border-[var(--border-color)] shadow-sm">
+        <div className="flex items-center gap-4">
           <button 
-            onClick={startNewChat}
-            className="cursor-pointer flex items-center gap-3 bg-[var(--bg-surface-hover)] hover:bg-[var(--bg-surface-hover)] text-sm font-medium py-3 px-4 rounded-full transition-colors w-full mb-6 mt-2 border border-[var(--border-color)]"
+            onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+            className="cursor-pointer p-2 hover:bg-[var(--bg-surface-hover)] rounded-full transition-colors text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
           >
-            <Plus size={18} className="text-[var(--text-secondary)]" />
-            <span className="tracking-wide">New legal query</span>
+            <Menu size={24} />
           </button>
+          <div className="flex items-center gap-2 text-[var(--text-primary)] cursor-pointer" onClick={startNewChat}>
+            <Scale className="text-blue-400 shrink-0" size={24} />
+            <h1 className="text-xl font-medium tracking-wide">LegalView</h1>
+          </div>
+        </div>
+      </header>
 
-          <SidebarHistoryList 
-            currentSessionId={currentSessionId} 
-            setCurrentSessionId={setCurrentSessionId} 
-            refreshTrigger={refreshTrigger}
+      <div className="flex-1 flex overflow-hidden relative">
+        
+        {/* Mobile Overlay */}
+        {isSidebarOpen && (
+          <div 
+            className="fixed inset-0 bg-black/40 z-20 md:hidden top-16" 
+            onClick={() => setIsSidebarOpen(false)}
+          />
+        )}
+
+        {/* Sidebar */}
+        <div className={`${isSidebarOpen ? 'w-[280px]' : 'w-0'} absolute md:relative z-30 h-full bg-[var(--bg-surface)] transition-all duration-300 ease-in-out flex flex-col shrink-0 border-r border-[var(--border-color)] overflow-hidden`}>
+          <div className="p-4 flex-1 flex flex-col h-full w-[280px]">
+            
+            <button 
+              onClick={startNewChat}
+              className="cursor-pointer flex items-center gap-3 bg-[var(--bg-surface-hover)] hover:bg-[var(--bg-surface-hover)] text-sm font-medium py-3 px-4 rounded-full transition-colors w-full mb-6 mt-2 border border-[var(--border-color)]"
+            >
+              <Plus size={18} className="text-[var(--text-secondary)]" />
+              <span className="tracking-wide">New legal query</span>
+            </button>
+
+            <SidebarHistoryList 
+              currentSessionId={currentSessionId} 
+              setCurrentSessionId={setCurrentSessionId} 
+              refreshTrigger={refreshTrigger}
+              token={token}
+              setIsSidebarOpen={setIsSidebarOpen}
+            />
+          </div>
+
+          {/* User Profile */}
+          <div className="p-4 border-t border-[var(--border-color)] bg-[var(--bg-surface)] w-[280px] shrink-0">
+            <div className="flex items-center gap-3 px-2 mb-4">
+              <div className="w-8 h-8 rounded-full bg-blue-500/20 flex items-center justify-center text-blue-400 shrink-0">
+                {user.isAnonymous ? <UserIcon size={16} /> : user.email?.charAt(0).toUpperCase()}
+              </div>
+              <div className="flex-1 truncate">
+                <p className="text-sm font-medium truncate">{user.isAnonymous ? 'Guest User' : user.email}</p>
+                <p className="text-[11px] text-gray-500">{user.isAnonymous ? 'History not saved' : 'History saved securely'}</p>
+              </div>
+            </div>
+            <button 
+              onClick={handleSignOut}
+              className="cursor-pointer flex items-center gap-3 w-full px-3 py-2 text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-hover)] rounded-lg transition-colors"
+            >
+              <LogOut size={16} />
+              Sign out
+            </button>
+          </div>
+        </div>
+
+        {/* Main Content Area */}
+        <div className="flex-1 flex flex-col h-full relative overflow-hidden">
+          
+          {/* Theme Toggle Top Right */}
+          <div className="absolute top-4 right-4 z-50">
+            <button 
+              onClick={() => setIsDark(!isDark)}
+              className="cursor-pointer flex items-center gap-3 bg-[var(--bg-surface)]/60 backdrop-blur-md border border-[var(--border-color)] px-4 py-2 text-sm font-medium text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-hover)] rounded-full transition-all shadow-md"
+            >
+              {isDark ? <Sun size={16} /> : <Moon size={16} />}
+              {isDark ? 'Light Mode' : 'Dark Mode'}
+            </button>
+          </div>
+          
+          {/* Chat Area (Scrollable body, fixed footer) */}
+          <ChatArea 
+            sessionId={currentSessionId} 
+            onMessageSent={() => setRefreshTrigger(prev => prev + 1)}
             token={token}
-            setIsSidebarOpen={setIsSidebarOpen}
+            isDark={isDark}
           />
         </div>
 
-        {/* User Profile */}
-        <div className="p-4 border-t border-[var(--border-color)] bg-[var(--bg-surface)] w-[280px] shrink-0">
-          <div className="flex items-center gap-3 px-2 mb-4">
-            <div className="w-8 h-8 rounded-full bg-blue-500/20 flex items-center justify-center text-blue-400 shrink-0">
-              {user.isAnonymous ? <UserIcon size={16} /> : user.email?.charAt(0).toUpperCase()}
-            </div>
-            <div className="flex-1 truncate">
-              <p className="text-sm font-medium truncate">{user.isAnonymous ? 'Guest User' : user.email}</p>
-              <p className="text-[11px] text-gray-500">{user.isAnonymous ? 'History not saved' : 'History saved securely'}</p>
-            </div>
-          </div>
-          <button 
-            onClick={handleSignOut}
-            className="cursor-pointer flex items-center gap-3 w-full px-3 py-2 text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-hover)] rounded-lg transition-colors"
-          >
-            <LogOut size={16} />
-            Sign out
-          </button>
-        </div>
       </div>
-
-      {/* Main Content Area */}
-      <div className="flex-1 flex flex-col h-full relative overflow-hidden">
-        
-        {/* Theme Toggle Top Right */}
-        <div className="absolute top-4 right-4 z-50">
-          <button 
-            onClick={() => setIsDark(!isDark)}
-            className="cursor-pointer flex items-center gap-3 bg-[var(--bg-surface)]/60 backdrop-blur-md border border-[var(--border-color)] px-4 py-2 text-sm font-medium text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-hover)] rounded-full transition-all shadow-md"
-          >
-            {isDark ? <Sun size={16} /> : <Moon size={16} />}
-            {isDark ? 'Light Mode' : 'Dark Mode'}
-          </button>
-        </div>
-        
-        {/* Fixed Navbar (Always shows hamburger) */}
-        <header className="h-16 flex items-center px-4 shrink-0 z-10 bg-[var(--bg-main)]">
-          <div className="flex items-center gap-4">
-            <button 
-              onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-              className="cursor-pointer p-2 hover:bg-[var(--bg-surface-hover)] rounded-full transition-colors text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
-            >
-              <Menu size={24} />
-            </button>
-            <div className="flex items-center gap-2 text-[var(--text-primary)] cursor-pointer" onClick={startNewChat}>
-              <Scale className="text-blue-400 shrink-0" size={24} />
-              <h1 className="text-xl font-medium tracking-wide">LegalView</h1>
-            </div>
-          </div>
-        </header>
-
-        {/* Chat Area (Scrollable body, fixed footer) */}
-        <ChatArea 
-          sessionId={currentSessionId} 
-          onMessageSent={() => setRefreshTrigger(prev => prev + 1)}
-          token={token}
-          isDark={isDark}
-        />
-      </div>
-
     </div>
   );
 }
