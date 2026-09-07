@@ -170,7 +170,7 @@ function SidebarHistoryList({ currentSessionId, setCurrentSessionId, refreshTrig
   const [editTitle, setEditTitle] = useState("");
 
   const fetchSessions = () => {
-    fetch('http://localhost:8000/sessions', {
+    fetch('http://13.235.74.216:8000/sessions', {
       headers: { 'Authorization': `Bearer ${token}` }
     })
       .then(res => res.json())
@@ -193,7 +193,7 @@ function SidebarHistoryList({ currentSessionId, setCurrentSessionId, refreshTrig
       return;
     }
     
-    fetch(`http://localhost:8000/sessions/${id}`, { 
+    fetch(`http://13.235.74.216:8000/sessions/${id}`, { 
       method: 'DELETE',
       headers: { 'Authorization': `Bearer ${token}` }
     })
@@ -210,7 +210,7 @@ function SidebarHistoryList({ currentSessionId, setCurrentSessionId, refreshTrig
       setEditingId(null);
       return;
     }
-    fetch(`http://localhost:8000/sessions/${id}/title`, {
+    fetch(`http://13.235.74.216:8000/sessions/${id}/title`, {
       method: 'PUT',
       headers: { 
         'Content-Type': 'application/json',
@@ -306,7 +306,7 @@ function ChatArea({ sessionId, onMessageSent, token, isDark }) {
   useEffect(() => {
     setLoading(true);
     setMessages([]); // Immediately clear the screen to prevent showing old chat
-    fetch(`http://localhost:8000/sessions/${sessionId}`, {
+    fetch(`http://13.235.74.216:8000/sessions/${sessionId}`, {
       headers: { 'Authorization': `Bearer ${token}` }
     })
       .then(res => {
@@ -340,7 +340,7 @@ function ChatArea({ sessionId, onMessageSent, token, isDark }) {
       const currentUser = auth.currentUser;
       const currentToken = await currentUser.getIdToken();
 
-      const res = await fetch('http://localhost:8000/query', {
+      const res = await fetch('http://13.235.74.216:8000/query', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
