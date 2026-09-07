@@ -11,6 +11,9 @@ RUN apt-get update && apt-get install -y \
 # Install uv for fast dependency resolution
 RUN pip install uv
 
+# Install CPU-only PyTorch first to save disk space
+RUN uv pip install --system torch --index-url https://download.pytorch.org/whl/cpu
+
 COPY pyproject.toml ./
 RUN uv pip install --system -r pyproject.toml
 
