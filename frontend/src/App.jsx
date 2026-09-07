@@ -4,6 +4,8 @@ import ReactMarkdown from 'react-markdown';
 import Login from './Login';
 import { auth, signOut, onAuthStateChanged } from './firebase';
 
+const API_URL = import.meta.env.VITE_API_URL || "http://13.235.74.216:8000";
+
 function App() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(window.innerWidth > 768);
   const [currentSessionId, setCurrentSessionId] = useState(`session_${Date.now()}`);
@@ -71,6 +73,19 @@ function App() {
       <div className={`${isSidebarOpen ? 'w-[280px]' : 'w-0'} absolute md:relative z-30 h-full bg-[var(--bg-surface)] transition-all duration-300 ease-in-out flex flex-col shrink-0 border-r border-[var(--border-color)] overflow-hidden`}>
         <div className="p-4 flex-1 flex flex-col h-full w-[280px]">
           
+          <div className="flex items-center gap-4 mb-4">
+            <button 
+              onClick={() => setIsSidebarOpen(false)}
+              className="cursor-pointer p-2 hover:bg-[var(--bg-surface-hover)] rounded-full transition-colors text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+            >
+              <Menu size={24} />
+            </button>
+            <div className="flex items-center gap-2 text-[var(--text-primary)] cursor-pointer" onClick={startNewChat}>
+              <Scale className="text-blue-400 shrink-0" size={24} />
+              <h1 className="text-xl font-medium tracking-wide">LegalView</h1>
+            </div>
+          </div>
+
           <button 
             onClick={startNewChat}
             className="cursor-pointer flex items-center gap-3 bg-[var(--bg-surface-hover)] hover:bg-[var(--bg-surface-hover)] text-sm font-medium py-3 px-4 rounded-full transition-colors w-full mb-6 mt-2 border border-[var(--border-color)]"
@@ -123,20 +138,22 @@ function App() {
           </button>
         </div>
         
-        {/* Fixed Navbar (Always shows hamburger) */}
+        {/* Fixed Navbar (Only shows hamburger when sidebar is closed) */}
         <header className="h-16 flex items-center px-4 shrink-0 z-10 bg-[var(--bg-main)]">
-          <div className="flex items-center gap-4">
-            <button 
-              onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-              className="cursor-pointer p-2 hover:bg-[var(--bg-surface-hover)] rounded-full transition-colors text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
-            >
-              <Menu size={24} />
-            </button>
-            <div className="flex items-center gap-2 text-[var(--text-primary)] cursor-pointer" onClick={startNewChat}>
-              <Scale className="text-blue-400 shrink-0" size={24} />
-              <h1 className="text-xl font-medium tracking-wide">LegalView</h1>
+          {!isSidebarOpen && (
+            <div className="flex items-center gap-4">
+              <button 
+                onClick={() => setIsSidebarOpen(true)}
+                className="cursor-pointer p-2 hover:bg-[var(--bg-surface-hover)] rounded-full transition-colors text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+              >
+                <Menu size={24} />
+              </button>
+              <div className="flex items-center gap-2 text-[var(--text-primary)] cursor-pointer" onClick={startNewChat}>
+                <Scale className="text-blue-400 shrink-0" size={24} />
+                <h1 className="text-xl font-medium tracking-wide">LegalView</h1>
+              </div>
             </div>
-          </div>
+          )}
         </header>
 
         {/* Chat Area (Scrollable body, fixed footer) */}
@@ -161,7 +178,7 @@ function SidebarHistoryList({ currentSessionId, setCurrentSessionId, refreshTrig
   const [editTitle, setEditTitle] = useState("");
 
   const fetchSessions = () => {
-    fetch('http://13.235.74.216:8000/sessions', {
+    fetch(`${API_URL}/sessions`, {
       headers: { 'Authorization': `Bearer ${token}` }
     })
       .then(res => res.json())
@@ -189,7 +206,7 @@ function SidebarHistoryList({ currentSessionId, setCurrentSessionId, refreshTrig
       return;
     }
     
-    fetch(`http://13.235.74.216:8000/sessions/${id}`, { 
+    fetch(`${API_URL}/sessions/${id}`, { 
       method: 'DELETE',
       headers: { 'Authorization': `Bearer ${token}` }
     })
@@ -206,7 +223,7 @@ function SidebarHistoryList({ currentSessionId, setCurrentSessionId, refreshTrig
       setEditingId(null);
       return;
     }
-    fetch(`http://13.235.74.216:8000/sessions/${id}/title`, {
+    fetch(`${API_URL}/sessions/${id}/title`, {
       method: 'PUT',
       headers: { 
         'Content-Type': 'application/json',
@@ -302,7 +319,7 @@ function ChatArea({ sessionId, onMessageSent, token, isDark }) {
   useEffect(() => {
     setLoading(true);
     setMessages([]); // Immediately clear the screen to prevent showing old chat
-    fetch(`http://13.235.74.216:8000/sessions/${sessionId}`, {
+    fetch(`${API_URL}/sessions/${sessionId}`, {
       headers: { 'Authorization': `Bearer ${token}` }
     })
       .then(res => {
@@ -336,7 +353,7 @@ function ChatArea({ sessionId, onMessageSent, token, isDark }) {
       const currentUser = auth.currentUser;
       const currentToken = await currentUser.getIdToken();
 
-      const res = await fetch('http://13.235.74.216:8000/query', {
+      const res = await fetch(`${API_URL}/query`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -391,7 +408,7 @@ function ChatArea({ sessionId, onMessageSent, token, isDark }) {
             
             {/* Information Boxes */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 w-full">
-              <div className="bg-[var(--bg-surface)] border border-[var(--border-color)] p-5 rounded-xl flex flex-col items-center text-center hover:bg-[var(--bg-surface-hover)] transition-colors cursor-pointer" onClick={() => setInput("What are the provisions for fundamental rights?")}>
+              <div className="bg-[var(--bg-surface)] border border-[var(--border-color)] p-5 rounded-xl flex flex-col items-center text-center hover:bg-[var(--bg-surface-hover)] transition-colors cursor-pointer" onClick={() => setInput("What is meant by an unfair trade practice under the Consumer Protection Act, 2019?")}>
                 <BookOpen size={24} className="text-blue-400 mb-3" />
                 <h3 className="text-[var(--text-primary)] font-medium mb-2 text-base">Explore Laws</h3>
                 <p className="text-sm text-[var(--text-secondary)] leading-relaxed">Ask about constitutional provisions, sections, and legal definitions</p>
