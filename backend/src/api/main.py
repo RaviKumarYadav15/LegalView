@@ -9,7 +9,7 @@ from src.core.config import settings
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Initialize Redis connection for Rate Limiting
-    redis_connection = redis.from_url(settings.redis_url, encoding="utf-8", decode_responses=True)
+    redis_connection = redis.from_url(settings.redis_url, encoding="utf-8")
     await FastAPILimiter.init(redis_connection)
     yield
     await redis_connection.close()

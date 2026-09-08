@@ -368,6 +368,13 @@ function ChatArea({ sessionId, onMessageSent, token, isDark }) {
           return;
       }
       
+      if (!res.ok) {
+          const errorText = await res.text();
+          setMessages(prev => [...prev, { id: Date.now() + 1, role: 'ai', content: `SERVER ERROR (${res.status}):\n\`\`\`json\n${errorText}\n\`\`\`` }]);
+          setLoading(false);
+          return;
+      }
+      
       const aiMsgId = Date.now() + 1;
       setMessages(prev => [...prev, { id: aiMsgId, role: 'ai', content: "", sources: [] }]);
       setLoading(false);
