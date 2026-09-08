@@ -35,7 +35,12 @@ async def handle_query(request: QueryRequest, current_user: dict = Depends(get_c
         # Fetch conversation history from Redis
         raw_history = redis_client.lrange(history_key, 0, -1)
         # Parse history JSON strings into objects
-        chat_history = [json.loads(msg) for msg in raw_history]
+        chat_history = []
+        for msg in raw_history:
+            try:
+                chat_history.append(json.loads(msg))
+            except json.JSONDecodeError:
+                pass
 
         # 0. Rewrite the query based on chat history so vector search can understand it
         standalone_query = rewrite_query(request.query, chat_history)

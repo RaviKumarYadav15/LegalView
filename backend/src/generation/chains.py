@@ -48,8 +48,12 @@ def rewrite_query(query: str, chat_history: list) -> str:
             
     messages.append(HumanMessage(content=f"Question: {query}"))
     
-    response = llm.invoke(messages)
-    return response.content.strip()
+    try:
+        response = llm.invoke(messages)
+        return response.content.strip()
+    except Exception as e:
+        print(f"Warning: rewrite_query failed: {e}")
+        return query
 
 def generate_answer(query: str, retrieved_context: list, chat_history: list = None) -> str:
     # Combine the top chunks into a single string of context, including their source metadata!
