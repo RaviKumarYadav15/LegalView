@@ -1,7 +1,16 @@
-﻿@import "tailwindcss";
+@import "tailwindcss";
 
 @theme {
   --color-*: initial;
+  --color-canvas: var(--bg-main);
+  --color-panel: var(--bg-surface);
+  --color-panel-hover: var(--bg-surface-hover);
+  --color-line: var(--border-color);
+  --color-ink: var(--text-primary);
+  --color-muted: var(--text-secondary);
+  --color-cta: var(--btn-primary-bg);
+  --color-cta-ink: var(--btn-primary-text);
+  --color-cta-hover: var(--btn-primary-hover);
 }
 
 @layer base {
