@@ -47,7 +47,6 @@ async def handle_query(request: QueryRequest, current_user: dict = Depends(get_c
         print(f"Original Query: {request.query}")
         print(f"Rewritten Query: {standalone_query}")
 
-        import json
         async def event_generator():
             try:
                 if "[GREETING]" in standalone_query.upper():
