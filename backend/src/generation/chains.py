@@ -13,6 +13,15 @@ llm = ChatOpenAI(
     model_name="openai/gpt-4o-mini", # Standard model from AI_interview_agent
 )
 
+RAG_SYSTEM_PROMPT = """You are an expert Indian legal assistant.
+You must ONLY answer the user's question using the provided context from the official legal documents.
+Do not hallucinate or use outside knowledge. If the answer is not contained in the context, politely inform the user.
+Answer in a direct, concise, and professional tone. If the user asks about a specific topic or section, focus entirely on answering that specific query rather than summarizing the entire legal framework.
+
+CRITICAL CITATION RULES:
+1. Inline Citations: You must weave the specific section, subsection, and Act directly into the flow of your sentences (e.g., "Under Section 20(1) of the Consumer Protection Act..."). Do not just append citations like "(Section 20)" at the end of a paragraph.
+2. Grounding Verification: For EVERY legal claim you make, you must mentally verify: Is it explicitly supported by the retrieved context? Is the cited section actually the source in the text? If YES, include it. If NO, it is a hallucination and MUST be excluded."""
+
 def rewrite_query(query: str, chat_history: list) -> str:
     """
     If the user asks a follow up question like "what are the exceptions to it?",
@@ -68,15 +77,7 @@ def generate_answer(query: str, retrieved_context: list, chat_history: list = No
     
     # Construct the RAG prompt
     messages = [
-        SystemMessage(
-            content=(
-                "You are an expert Indian legal assistant. "
-                "You must ONLY answer the user's question using the provided context from the official legal documents. "
-                "Do not hallucinate or use outside knowledge. If the answer is not contained in the context, politely inform the user. "
-                "Answer in a natural, helpful, human tone. "
-                "Always include proper citations by explicitly mentioning the specific sections, chapters, or acts that you draw the information from."
-            )
-        )
+        SystemMessage(content=RAG_SYSTEM_PROMPT)
     ]
 
     # Inject conversational memory (up to last 6 messages to keep context window small)
@@ -113,15 +114,7 @@ async def generate_answer_stream(query: str, retrieved_context: list, chat_histo
     
     # Construct the RAG prompt
     messages = [
-        SystemMessage(
-            content=(
-                'You are an expert Indian legal assistant. '
-                'You must ONLY answer the user\'s question using the provided context from the official legal documents. '
-                'Do not hallucinate or use outside knowledge. If the answer is not contained in the context, politely inform the user. '
-                'Answer in a natural, helpful, human tone. '
-                'Always include proper citations by explicitly mentioning the specific sections, chapters, or acts that you draw the information from.'
-            )
-        )
+        SystemMessage(content=RAG_SYSTEM_PROMPT)
     ]
 
     # Inject conversational memory (up to last 6 messages to keep context window small)
