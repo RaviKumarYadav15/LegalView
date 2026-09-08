@@ -70,7 +70,9 @@ def generate_answer(query: str, retrieved_context: list, chat_history: list = No
     for doc in retrieved_context:
         filename = doc.metadata.get('source', 'Unknown Document').split('\\')[-1].split('/')[-1]
         page = doc.metadata.get('page', 0) + 1
-        header = f"--- SOURCE: {filename} (Page {page}) ---"
+        legal_meta = doc.metadata.get('legal_meta', '')
+        meta_str = f" | {legal_meta}" if legal_meta else ""
+        header = f"--- SOURCE: {filename} (Page {page}){meta_str} ---"
         context_parts.append(f"{header}\n{doc.page_content}")
         
     context_text = "\n\n".join(context_parts)
@@ -107,7 +109,9 @@ async def generate_answer_stream(query: str, retrieved_context: list, chat_histo
     for doc in retrieved_context:
         filename = doc.metadata.get('source', 'Unknown Document').split('\\')[-1].split('/')[-1]
         page = doc.metadata.get('page', 0) + 1
-        header = f'--- SOURCE: {filename} (Page {page}) ---'
+        legal_meta = doc.metadata.get('legal_meta', '')
+        meta_str = f" | {legal_meta}" if legal_meta else ""
+        header = f'--- SOURCE: {filename} (Page {page}){meta_str} ---'
         context_parts.append(f'{header}\n{doc.page_content}')
         
     context_text = '\n\n'.join(context_parts)
