@@ -129,7 +129,8 @@ async def handle_query(request: QueryRequest, current_user: dict = Depends(get_c
         return StreamingResponse(event_generator(), media_type="text/event-stream")
 
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        import traceback
+        raise HTTPException(status_code=500, detail=traceback.format_exc())
 
 @router.get("/sessions")
 async def get_sessions(current_user: dict = Depends(get_current_user)):
@@ -176,7 +177,8 @@ async def get_sessions(current_user: dict = Depends(get_current_user)):
                 
         return {"sessions": sessions}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        import traceback
+        raise HTTPException(status_code=500, detail=traceback.format_exc())
 
 @router.get("/sessions/{session_id}")
 async def get_session_history(session_id: str, current_user: dict = Depends(get_current_user)):
@@ -221,7 +223,8 @@ async def get_session_history(session_id: str, current_user: dict = Depends(get_
                     
         return {"messages": formatted_history}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        import traceback
+        raise HTTPException(status_code=500, detail=traceback.format_exc())
 
 class RenameRequest(BaseModel):
     title: str
@@ -241,7 +244,8 @@ async def rename_session(session_id: str, request: RenameRequest, current_user: 
             
         return {"status": "success", "title": request.title}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        import traceback
+        raise HTTPException(status_code=500, detail=traceback.format_exc())
 
 @router.delete("/sessions/{session_id}")
 async def delete_session(session_id: str, current_user: dict = Depends(get_current_user)):
@@ -258,4 +262,5 @@ async def delete_session(session_id: str, current_user: dict = Depends(get_curre
             
         return {"status": "success"}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        import traceback
+        raise HTTPException(status_code=500, detail=traceback.format_exc())
