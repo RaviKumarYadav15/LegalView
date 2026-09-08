@@ -362,22 +362,48 @@ function ChatArea({ sessionId, onMessageSent, token, isDark }) {
         body: JSON.stringify({ query: input, session_id: sessionId }),
       });
       
-      const data = await res.json();
-      
       if (res.status === 429) {
           setMessages(prev => [...prev, { id: Date.now() + 1, role: 'ai', content: "You are sending messages too quickly. Please slow down" }]);
           setLoading(false);
           return;
       }
       
-      const aiMsg = {
-        id: Date.now() + 1,
-        role: 'ai',
-        content: data.answer || "Sorry, I couldn't generate an answer",
-        sources: data.chunks || []
-      };
-      setMessages(prev => [...prev, aiMsg]);
+      const aiMsgId = Date.now() + 1;
+      setMessages(prev => [...prev, { id: aiMsgId, role: 'ai', content: "", sources: [] }]);
       setLoading(false);
+      
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      
+      let currentEvent = null;
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        
+        const chunk = decoder.decode(value, { stream: true });
+        const lines = chunk.split('\n');
+        
+        for (const line of lines) {
+          if (line.startsWith('event: ')) {
+            currentEvent = line.substring(7).trim();
+          } else if (line.startsWith('data: ')) {
+            const dataStr = line.substring(6).trim();
+            if (dataStr && dataStr !== '{}') {
+              try {
+                const parsedData = JSON.parse(dataStr);
+                if (currentEvent === 'sources') {
+                  setMessages(prev => prev.map(msg => msg.id === aiMsgId ? { ...msg, sources: parsedData } : msg));
+                } else if (currentEvent === 'chunk') {
+                  setMessages(prev => prev.map(msg => msg.id === aiMsgId ? { ...msg, content: msg.content + parsedData } : msg));
+                }
+              } catch (e) {
+                // Ignore partial JSON parse errors
+              }
+            }
+          }
+        }
+      }
+      
       if (onMessageSent) onMessageSent();
       
     } catch (err) {
