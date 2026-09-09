@@ -43,6 +43,12 @@ def is_greeting(query: str) -> bool:
 def is_off_topic(query: str) -> bool:
     return "[OFF_TOPIC]" in query.upper()
 
+def truncate_title(text: str, max_length: int = 40) -> str:
+    """Truncates text to max_length for sidebar titles."""
+    if len(text) <= max_length:
+        return text
+    return text[:max_length].rsplit(' ', 1)[0] + "..."
+
 async def canned_reply(text: str):
     yield f"event: sources\ndata: []\n\n"
     yield f"event: chunk\ndata: {json.dumps(text)}\n\n"
