@@ -104,14 +104,14 @@ async def answer_from_documents(request: QueryRequest, standalone_query: str, ch
         import time
         timestamp = int(time.time() * 1000)
         
-        messages_ref.add({**user_msg_dict, "timestamp": timestamp})
-        messages_ref.add({**ai_msg_dict, "timestamp": timestamp + 1})
+        await messages_ref.add({**user_msg_dict, "timestamp": timestamp})
+        await messages_ref.add({**ai_msg_dict, "timestamp": timestamp + 1})
 
         session_metadata = {"updated_at": timestamp}
         if await redis_client.llen(history_key) <= 2:
             session_metadata["title"] = truncate_title(request.query)
 
-        doc_ref.set(session_metadata, merge=True)
+        await doc_ref.set(session_metadata, merge=True)
 
 @router.post("/query", dependencies=[Depends(RateLimiter(times=10, seconds=60))])
 async def handle_query(request: QueryRequest, current_user: dict = Depends(get_current_user)):
@@ -172,7 +172,7 @@ async def get_sessions(current_user: dict = Depends(get_current_user)):
             sessions_ref = db.collection('users').document(user_id).collection('sessions').order_by('updated_at', direction='DESCENDING')
             docs = sessions_ref.stream()
             
-            for doc in docs:
+            async for doc in docs:
                 session_id = doc.id
                 data = doc.to_dict()
                 
@@ -219,10 +219,12 @@ async def get_session_history(session_id: str, current_user: dict = Depends(get_
                 messages_ref = db.collection('users').document(user_id).collection('sessions').document(session_id).collection('messages').order_by('timestamp')
                 docs = messages_ref.stream()
                 
-                for idx, doc in enumerate(docs):
+                idx = 0
+                async for doc in docs:
+                    idx += 1
                     msg = doc.to_dict()
                     formatted_history.append({
-                        "id": idx + 1,
+                        "id": idx,
                         "role": msg.get("role"),
                         "content": msg.get("content"),
                         "sources": msg.get("sources", [])
@@ -249,7 +251,7 @@ async def rename_session(session_id: str, request: RenameRequest, current_user: 
         
         # Save permanently to Firestore
         if not current_user["is_guest"] and db is not None:
-            db.collection('users').document(user_id).collection('sessions').document(session_id).set({
+            await db.collection('users').document(user_id).collection('sessions').document(session_id).set({
                 "title": request.title
             }, merge=True)
             
@@ -269,7 +271,7 @@ async def delete_session(session_id: str, current_user: dict = Depends(get_curre
         # Delete from Firestore
         if not current_user["is_guest"] and db is not None:
             # Note: Deleting a document does not delete its subcollections in Firestore.
-            db.collection('users').document(user_id).collection('sessions').document(session_id).delete()
+            await db.collection('users').document(user_id).collection('sessions').document(session_id).delete()
             
         return {"status": "success"}
     except Exception as e:

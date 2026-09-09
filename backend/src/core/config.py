@@ -7,6 +7,7 @@ class Settings(BaseSettings):
     embedding_model: str = "all-MiniLM-L6-v2"
     reranker_model: str = "cross-encoder/ms-marco-MiniLM-L-6-v2"
     redis_url: str = "redis://localhost:6379"
+    firebase_service_account_json: str = ""
     
     class Config:
         env_file = ".env"
