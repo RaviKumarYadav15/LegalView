@@ -13,3 +13,7 @@ pydantic-settings
 python-multipart
 requests
 firebase-admin==6.5.0
+redis
+fastapi-limiter==0.1.5
+langchain-openai
+langchain-huggingface

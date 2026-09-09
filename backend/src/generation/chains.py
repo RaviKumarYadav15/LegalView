@@ -64,45 +64,6 @@ def rewrite_query(query: str, chat_history: list) -> str:
         print(f"Warning: rewrite_query failed: {e}")
         return query
 
-def generate_answer(query: str, retrieved_context: list, chat_history: list = None) -> str:
-    # Combine the top chunks into a single string of context, including their source metadata!
-    context_parts = []
-    for doc in retrieved_context:
-        filename = doc.metadata.get('source', 'Unknown Document').split('\\')[-1].split('/')[-1]
-        page = doc.metadata.get('page', 0) + 1
-        legal_meta = doc.metadata.get('legal_meta', '')
-        meta_str = f" | {legal_meta}" if legal_meta else ""
-        header = f"--- SOURCE: {filename} (Page {page}){meta_str} ---"
-        context_parts.append(f"{header}\n{doc.page_content}")
-        
-    context_text = "\n\n".join(context_parts)
-    
-    # Construct the RAG prompt
-    messages = [
-        SystemMessage(content=RAG_SYSTEM_PROMPT)
-    ]
-
-    # Inject conversational memory (up to last 6 messages to keep context window small)
-    if chat_history:
-        for msg in chat_history[-6:]:
-            if msg.get("role") == "user":
-                messages.append(HumanMessage(content=msg.get("content", "")))
-            elif msg.get("role") == "ai":
-                messages.append(AIMessage(content=msg.get("content", "")))
-    
-    # Finally, append the actual new query with the retrieved context
-    messages.append(
-        HumanMessage(
-            content=f"Here is the retrieved legal context for my next question:\n{context_text}\n\nQuestion: {query}"
-        )
-    )
-    
-    # Get the AI response
-    response = llm.invoke(messages)
-    
-    return response.content
-
-
 async def generate_answer_stream(query: str, retrieved_context: list, chat_history: list = None):
     # Combine the top chunks into a single string of context, including their source metadata!
     context_parts = []

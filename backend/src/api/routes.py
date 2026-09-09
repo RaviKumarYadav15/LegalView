@@ -14,7 +14,8 @@ import re
 router = APIRouter()
 
 # Synchronous Redis client for caching and chat history
-redis_client = redis.Redis.from_url(settings.redis_url, decode_responses=True)
+import redis.asyncio as aioredis
+redis_client = aioredis.from_url(settings.redis_url, decode_responses=True)
 
 class QueryRequest(BaseModel):
     query: str
@@ -33,7 +34,7 @@ async def handle_query(request: QueryRequest, current_user: dict = Depends(get_c
         history_key = f"chat_history:{user_id}:{request.session_id}"
         
         # Fetch conversation history from Redis
-        raw_history = redis_client.lrange(history_key, 0, -1)
+        raw_history = await redis_client.lrange(history_key, 0, -1)
         # Parse history JSON strings into objects
         chat_history = []
         for msg in raw_history:
@@ -100,9 +101,9 @@ async def handle_query(request: QueryRequest, current_user: dict = Depends(get_c
                 user_msg_dict = {"role": "user", "content": request.query}
                 ai_msg_dict = {"role": "ai", "content": full_answer, "sources": chunks_data}
                 
-                redis_client.rpush(history_key, json.dumps(user_msg_dict))
-                redis_client.rpush(history_key, json.dumps(ai_msg_dict))
-                redis_client.expire(history_key, 3600)
+                await redis_client.rpush(history_key, json.dumps(user_msg_dict))
+                await redis_client.rpush(history_key, json.dumps(ai_msg_dict))
+                await redis_client.expire(history_key, 3600)
 
                 # 4. WRITE-THROUGH DB LOGIC: If not a guest, save permanently to Firestore
                 if not is_guest and db is not None:
@@ -117,7 +118,7 @@ async def handle_query(request: QueryRequest, current_user: dict = Depends(get_c
 
                     session_metadata = {"updated_at": timestamp}
                     if redis_client.llen(history_key) <= 2:
-                        session_metadata["title"] = request.query[:40] + ("..." if len(request.query) > 40 else "")
+                        session_metadata["title"] = truncate_title(request.query)
 
                     doc_ref.set(session_metadata, merge=True)
 
@@ -152,7 +153,7 @@ async def get_sessions(current_user: dict = Depends(get_current_user)):
                     first_msg_raw = redis_client.lindex(key, 0)
                     if first_msg_raw:
                         first_msg = json.loads(first_msg_raw)
-                        title = first_msg.get("content", "New Chat")[:40] + "..."
+                        title = truncate_title(first_msg.get("content", "New Chat"))
                         
                 sessions.append({"id": session_id, "title": title})
         else:
@@ -188,7 +189,7 @@ async def get_session_history(session_id: str, current_user: dict = Depends(get_
         history_key = f"chat_history:{user_id}:{session_id}"
         
         # 1. Try to read from fast Redis cache first
-        raw_history = redis_client.lrange(history_key, 0, -1)
+        raw_history = await redis_client.lrange(history_key, 0, -1)
         
         formatted_history = []
         if raw_history:
@@ -218,7 +219,7 @@ async def get_session_history(session_id: str, current_user: dict = Depends(get_
                     
                     # Rehydrate the cache by pushing back to Redis so next read is fast
                     redis_client.rpush(history_key, json.dumps(msg))
-                    redis_client.expire(history_key, 3600)
+                    await redis_client.expire(history_key, 3600)
                     
         return {"messages": formatted_history}
     except Exception as e:

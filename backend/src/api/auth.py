@@ -30,7 +30,7 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Security(
         return {
             "user_id": decoded_token.get("uid"),
             "email": decoded_token.get("email"),
-            "is_guest": decoded_token.get("provider_id") == "anonymous" or "email" not in decoded_token
+            "is_guest": decoded_token.get("firebase", {}).get("sign_in_provider") == "anonymous"
         }
     except Exception as e:
         raise HTTPException(
