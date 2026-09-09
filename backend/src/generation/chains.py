@@ -64,11 +64,13 @@ def rewrite_query(query: str, chat_history: list) -> str:
         print(f"Warning: rewrite_query failed: {e}")
         return query
 
-async def generate_answer_stream(query: str, retrieved_context: list, chat_history: list = None):
-    # Combine the top chunks into a single string of context, including their source metadata!
+from src.core.utils import basename
+
+def _build_messages(query: str, retrieved_context: list, chat_history: list = None):
+    """Builds the full prompt: system instructions + history + question."""
     context_parts = []
     for doc in retrieved_context:
-        filename = doc.metadata.get('source', 'Unknown Document').split('\\')[-1].split('/')[-1]
+        filename = basename(doc.metadata.get("source", "Unknown Document"))
         page = doc.metadata.get('page', 0) + 1
         legal_meta = doc.metadata.get('legal_meta', '')
         meta_str = f" | {legal_meta}" if legal_meta else ""
@@ -77,12 +79,8 @@ async def generate_answer_stream(query: str, retrieved_context: list, chat_histo
         
     context_text = '\n\n'.join(context_parts)
     
-    # Construct the RAG prompt
-    messages = [
-        SystemMessage(content=RAG_SYSTEM_PROMPT)
-    ]
+    messages = [SystemMessage(content=RAG_SYSTEM_PROMPT)]
 
-    # Inject conversational memory (up to last 6 messages to keep context window small)
     if chat_history:
         for msg in chat_history[-6:]:
             if msg.get('role') == 'user':
@@ -90,14 +88,15 @@ async def generate_answer_stream(query: str, retrieved_context: list, chat_histo
             elif msg.get('role') == 'ai':
                 messages.append(AIMessage(content=msg.get('content', '')))
     
-    # Finally, append the actual new query with the retrieved context
     messages.append(
         HumanMessage(
             content=f'Here is the retrieved legal context for my next question:\n{context_text}\n\nQuestion: {query}'
         )
     )
-    
-    # Yield the AI response chunk by chunk
+    return messages
+
+async def generate_answer_stream(query: str, retrieved_context: list, chat_history: list = None):
+    messages = _build_messages(query, retrieved_context, chat_history)
     async for chunk in llm.astream(messages):
         if chunk.content:
             yield chunk.content

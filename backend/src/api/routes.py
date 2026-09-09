@@ -6,6 +6,7 @@ from src.generation.chains import generate_answer, rewrite_query, generate_answe
 from src.api.auth import get_current_user, db
 from fastapi_limiter.depends import RateLimiter
 from src.core.config import settings
+from src.core.utils import basename
 import redis
 import json
 import hashlib
@@ -24,104 +25,108 @@ class QueryRequest(BaseModel):
 
 
 # Rate Limit: Max 10 queries per minute per user/IP
+
+async def load_history(user_id: str, session_id: str) -> list:
+    history_key = f"chat_history:{user_id}:{session_id}"
+    raw_history = await redis_client.lrange(history_key, 0, -1)
+    chat_history = []
+    for msg in raw_history:
+        try:
+            chat_history.append(json.loads(msg))
+        except json.JSONDecodeError:
+            pass
+    return chat_history
+
+def is_greeting(query: str) -> bool:
+    return "[GREETING]" in query.upper()
+
+def is_off_topic(query: str) -> bool:
+    return "[OFF_TOPIC]" in query.upper()
+
+async def canned_reply(text: str):
+    yield f"event: sources\ndata: []\n\n"
+    yield f"event: chunk\ndata: {json.dumps(text)}\n\n"
+
+async def answer_from_documents(request: QueryRequest, standalone_query: str, chat_history: list, user_id: str, is_guest: bool):
+    top_chunks = hybrid_search(standalone_query)
+    
+    chunks_data = [
+        {
+            "id": idx, 
+            "text": chunk.page_content, 
+            "score": chunk.metadata.get("rerank_score", 0.0),
+            "source": basename(chunk.metadata.get("source", "Unknown Document")),
+            "page": chunk.metadata.get("page", 0) + 1,
+            "legal_meta": chunk.metadata.get("legal_meta")
+        } 
+        for idx, chunk in enumerate(top_chunks)
+    ]
+    
+    yield f"event: sources\ndata: {json.dumps(chunks_data)}\n\n"
+    
+    full_answer = ""
+    cache_content_string = request.query + json.dumps(chat_history) + json.dumps(chunks_data)
+    query_hash = hashlib.md5(cache_content_string.encode('utf-8')).hexdigest()
+    cache_key = f"llm_cache:{query_hash}"
+    
+    cached_answer = await redis_client.get(cache_key)
+    
+    if cached_answer:
+        full_answer = cached_answer
+        yield f"event: chunk\ndata: {json.dumps(full_answer)}\n\n"
+    else:
+        async for chunk in generate_answer_stream(request.query, top_chunks, chat_history):
+            full_answer += chunk
+            yield f"event: chunk\ndata: {json.dumps(chunk)}\n\n"
+        
+        await redis_client.setex(cache_key, 86400, full_answer)
+
+    # 3. Save this interaction to Redis Chat History (Expire after 1 hour)
+    history_key = f"chat_history:{user_id}:{request.session_id}"
+    user_msg_dict = {"role": "user", "content": request.query}
+    ai_msg_dict = {"role": "ai", "content": full_answer, "sources": chunks_data}
+    
+    await redis_client.rpush(history_key, json.dumps(user_msg_dict))
+    await redis_client.rpush(history_key, json.dumps(ai_msg_dict))
+    await redis_client.expire(history_key, 3600)
+
+    # 4. WRITE-THROUGH DB LOGIC: If not a guest, save permanently to Firestore
+    if not is_guest and db is not None:
+        doc_ref = db.collection('users').document(user_id).collection('sessions').document(request.session_id)
+        messages_ref = doc_ref.collection('messages')
+        
+        import time
+        timestamp = int(time.time() * 1000)
+        
+        messages_ref.add({**user_msg_dict, "timestamp": timestamp})
+        messages_ref.add({**ai_msg_dict, "timestamp": timestamp + 1})
+
+        session_metadata = {"updated_at": timestamp}
+        if await redis_client.llen(history_key) <= 2:
+            session_metadata["title"] = truncate_title(request.query)
+
+        doc_ref.set(session_metadata, merge=True)
+
 @router.post("/query", dependencies=[Depends(RateLimiter(times=10, seconds=60))])
 async def handle_query(request: QueryRequest, current_user: dict = Depends(get_current_user)):
     try:
         user_id = current_user["user_id"]
         is_guest = current_user["is_guest"]
         
-        # Namespace keys by user_id for security
-        history_key = f"chat_history:{user_id}:{request.session_id}"
-        
-        # Fetch conversation history from Redis
-        raw_history = await redis_client.lrange(history_key, 0, -1)
-        # Parse history JSON strings into objects
-        chat_history = []
-        for msg in raw_history:
-            try:
-                chat_history.append(json.loads(msg))
-            except json.JSONDecodeError:
-                pass
-
-        # 0. Rewrite the query based on chat history so vector search can understand it
-        standalone_query = rewrite_query(request.query, chat_history)
-        print(f"Original Query: {request.query}")
-        print(f"Rewritten Query: {standalone_query}")
+        history = await load_history(user_id, request.session_id)
+        standalone_query = rewrite_query(request.query, history)
 
         async def event_generator():
             try:
-                if "[GREETING]" in standalone_query.upper():
+                if is_greeting(standalone_query):
                     answer = "Hello! I am LegalView, your AI legal assistant. How can I help you today?"
-                    chunks_data = []
-                    yield f"event: sources\ndata: []\n\n"
-                    yield f"event: chunk\ndata: {json.dumps(answer)}\n\n"
-                    full_answer = answer
-                elif "[OFF_TOPIC]" in standalone_query.upper():
+                    async for evt in canned_reply(answer): yield evt
+                elif is_off_topic(standalone_query):
                     answer = "I am specialized strictly in answering legal questions based on your provided documents. Please ask a legal-related query!"
-                    chunks_data = []
-                    yield f"event: sources\ndata: []\n\n"
-                    yield f"event: chunk\ndata: {json.dumps(answer)}\n\n"
-                    full_answer = answer
+                    async for evt in canned_reply(answer): yield evt
                 else:
-                    # 1. Retrieve the top context chunks using RRF + Cross-Encoder
-                    top_chunks = hybrid_search(standalone_query)
-                    
-                    chunks_data = [
-                        {
-                            "id": idx, 
-                            "text": chunk.page_content, 
-                            "score": chunk.metadata.get("rerank_score", 0.0),
-                            "source": chunk.metadata.get("source", "Unknown Document").split("\\")[-1].split("/")[-1],
-                            "page": chunk.metadata.get("page", 0) + 1,
-                            "legal_meta": chunk.metadata.get("legal_meta")
-                        } 
-                        for idx, chunk in enumerate(top_chunks)
-                    ]
-                    
-                    yield f"event: sources\ndata: {json.dumps(chunks_data)}\n\n"
-                    
-                    full_answer = ""
-                    cache_content_string = request.query + json.dumps(chat_history) + json.dumps(chunks_data)
-                    query_hash = hashlib.md5(cache_content_string.encode('utf-8')).hexdigest()
-                    cache_key = f"llm_cache:{query_hash}"
-                    
-                    cached_answer = redis_client.get(cache_key)
-                    
-                    if cached_answer:
-                        full_answer = cached_answer
-                        yield f"event: chunk\ndata: {json.dumps(full_answer)}\n\n"
-                    else:
-                        async for chunk in generate_answer_stream(request.query, top_chunks, chat_history):
-                            full_answer += chunk
-                            yield f"event: chunk\ndata: {json.dumps(chunk)}\n\n"
-                        
-                        redis_client.setex(cache_key, 86400, full_answer)
-
-                # 3. Save this interaction to Redis Chat History (Expire after 1 hour)
-                user_msg_dict = {"role": "user", "content": request.query}
-                ai_msg_dict = {"role": "ai", "content": full_answer, "sources": chunks_data}
-                
-                await redis_client.rpush(history_key, json.dumps(user_msg_dict))
-                await redis_client.rpush(history_key, json.dumps(ai_msg_dict))
-                await redis_client.expire(history_key, 3600)
-
-                # 4. WRITE-THROUGH DB LOGIC: If not a guest, save permanently to Firestore
-                if not is_guest and db is not None:
-                    doc_ref = db.collection('users').document(user_id).collection('sessions').document(request.session_id)
-                    messages_ref = doc_ref.collection('messages')
-                    
-                    import time
-                    timestamp = int(time.time() * 1000)
-                    
-                    messages_ref.add({**user_msg_dict, "timestamp": timestamp})
-                    messages_ref.add({**ai_msg_dict, "timestamp": timestamp + 1})
-
-                    session_metadata = {"updated_at": timestamp}
-                    if redis_client.llen(history_key) <= 2:
-                        session_metadata["title"] = truncate_title(request.query)
-
-                    doc_ref.set(session_metadata, merge=True)
-
+                    async for evt in answer_from_documents(request, standalone_query, history, user_id, is_guest):
+                        yield evt
                 yield "event: done\ndata: {}\n\n"
             except Exception as e:
                 yield f"event: error\ndata: {json.dumps(str(e))}\n\n"
@@ -143,14 +148,14 @@ async def get_sessions(current_user: dict = Depends(get_current_user)):
         
         if is_guest or db is None:
             # Guests only read from Redis
-            keys = redis_client.keys(f"chat_history:{user_id}:*")
+            keys = await redis_client.keys(f"chat_history:{user_id}:*")
             for key in keys:
                 session_id = key.split(f"chat_history:{user_id}:")[1]
-                custom_title = redis_client.get(f"chat_title:{user_id}:{session_id}")
+                custom_title = await redis_client.get(f"chat_title:{user_id}:{session_id}")
                 
                 title = custom_title if custom_title else "New Chat"
                 if not custom_title:
-                    first_msg_raw = redis_client.lindex(key, 0)
+                    first_msg_raw = await redis_client.lindex(key, 0)
                     if first_msg_raw:
                         first_msg = json.loads(first_msg_raw)
                         title = truncate_title(first_msg.get("content", "New Chat"))
@@ -166,7 +171,7 @@ async def get_sessions(current_user: dict = Depends(get_current_user)):
                 data = doc.to_dict()
                 
                 # Check redis first for custom title for speed, fallback to DB
-                custom_title = redis_client.get(f"chat_title:{user_id}:{session_id}")
+                custom_title = await redis_client.get(f"chat_title:{user_id}:{session_id}")
                 title = custom_title if custom_title else data.get("title")
                 
                 # If STILL no title (from older sessions), fallback
@@ -218,7 +223,7 @@ async def get_session_history(session_id: str, current_user: dict = Depends(get_
                     })
                     
                     # Rehydrate the cache by pushing back to Redis so next read is fast
-                    redis_client.rpush(history_key, json.dumps(msg))
+                    await redis_client.rpush(history_key, json.dumps(msg))
                     await redis_client.expire(history_key, 3600)
                     
         return {"messages": formatted_history}
@@ -234,7 +239,7 @@ async def rename_session(session_id: str, request: RenameRequest, current_user: 
     try:
         user_id = current_user["user_id"]
         # Save title to fast Redis
-        redis_client.set(f"chat_title:{user_id}:{session_id}", request.title)
+        await redis_client.set(f"chat_title:{user_id}:{session_id}", request.title)
         
         # Save permanently to Firestore
         if not current_user["is_guest"] and db is not None:
@@ -252,8 +257,8 @@ async def delete_session(session_id: str, current_user: dict = Depends(get_curre
     try:
         user_id = current_user["user_id"]
         # Delete from Redis
-        redis_client.delete(f"chat_history:{user_id}:{session_id}")
-        redis_client.delete(f"chat_title:{user_id}:{session_id}")
+        await redis_client.delete(f"chat_history:{user_id}:{session_id}")
+        await redis_client.delete(f"chat_title:{user_id}:{session_id}")
         
         # Delete from Firestore
         if not current_user["is_guest"] and db is not None:
