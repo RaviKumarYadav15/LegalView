@@ -2,7 +2,7 @@ from fastapi import APIRouter, HTTPException, Depends, Request
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from src.retrieval.hybrid import hybrid_search
-from src.generation.chains import generate_answer, rewrite_query, generate_answer_stream
+from src.generation.chains import rewrite_query, generate_answer_stream
 from src.api.auth import get_current_user, db
 from fastapi_limiter.depends import RateLimiter
 from src.core.config import settings
