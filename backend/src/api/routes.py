@@ -117,6 +117,8 @@ async def answer_from_documents(request: QueryRequest, standalone_query: str, ch
         else:
             full_answer = "I apologize, but I could not find a verifiable answer to this in your documents. I have refused to answer to prevent hallucinating incorrect legal information."
             yield f"event: status\ndata: {json.dumps('Verification Failed.')}\n\n"
+            chunks_data = []
+            yield f"event: sources\ndata: []\n\n"
 
         await asyncio.sleep(0.01)
         yield f"event: chunk\ndata: {json.dumps(full_answer)}\n\n"
