@@ -43,7 +43,7 @@ async def init_redis_semantic_index():
         except Exception as e:
             print(f"Error creating Semantic Cache index: {e}")
 
-async def check_semantic_cache(query: str, threshold: float = 0.05):
+async def check_semantic_cache(query: str, threshold: float = 0.15):
     """
     Search for a semantically similar query in Redis.
     Cosine distance threshold: 0.05 means >= 95% similarity.
@@ -68,7 +68,9 @@ async def check_semantic_cache(query: str, threshold: float = 0.05):
         if results.docs:
             doc = results.docs[0]
             score = float(doc.vector_score)
+            print(f'[SEMANTIC CACHE] Closest match distance: {score} (Threshold: {threshold})', flush=True)
             if score <= threshold:
+                print(f'[SEMANTIC CACHE] HIT! Bypassing LLM.', flush=True)
                 # doc.answer comes back as bytes because decode_responses=False
                 return doc.answer.decode('utf-8')
     except Exception as e:

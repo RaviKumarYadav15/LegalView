@@ -73,9 +73,10 @@ async def answer_from_documents(request: QueryRequest, standalone_query: str, ch
     
     full_answer = ""
     # Check Semantic Cache using the standalone (rewritten) query
-    cached_answer = await check_semantic_cache(standalone_query, threshold=0.05)
+    cached_answer = await check_semantic_cache(standalone_query, threshold=0.15)
     
     if cached_answer:
+        print(f'[ROUTES] Streaming answer directly from cache!', flush=True)
         full_answer = cached_answer
         yield f"event: chunk\ndata: {json.dumps(full_answer)}\n\n"
     else:
@@ -86,6 +87,7 @@ async def answer_from_documents(request: QueryRequest, standalone_query: str, ch
         # Save to semantic cache in background (without blocking response)
         # We save the standalone_query, since it has resolved context (e.g., "What is murder?" instead of "What is it?")
         import asyncio
+        print(f'[ROUTES] Saving new answer to Semantic Cache...', flush=True)
         asyncio.create_task(save_to_semantic_cache(standalone_query, full_answer))
 
     # 3. Save this interaction to Redis Chat History (Expire after 1 hour)
