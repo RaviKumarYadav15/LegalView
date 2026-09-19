@@ -71,8 +71,10 @@ async def check_semantic_cache(query: str, threshold: float = 0.15):
             print(f'[SEMANTIC CACHE] Closest match distance: {score} (Threshold: {threshold})', flush=True)
             if score <= threshold:
                 print(f'[SEMANTIC CACHE] HIT! Bypassing LLM.', flush=True)
-                # doc.answer comes back as bytes because decode_responses=False
-                return doc.answer.decode('utf-8')
+                answer = doc.answer
+                if isinstance(answer, bytes):
+                    return answer.decode('utf-8')
+                return answer
     except Exception as e:
         print(f"Semantic Cache check error: {e}")
         
