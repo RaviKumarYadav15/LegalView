@@ -95,12 +95,14 @@ def _build_messages(query: str, retrieved_context: list, chat_history: list = No
     )
     return messages
 
-async def generate_draft_answer(query: str, retrieved_context: list, chat_history: list = None) -> str:
+async def generate_draft_answer(query: str, retrieved_context: list, chat_history: list = None, feedback: str = None) -> str:
     messages = _build_messages(query, retrieved_context, chat_history)
+    if feedback:
+        messages.append(HumanMessage(content=f"Your previous attempt was rejected by the verifier with this feedback:\n\n{feedback}\n\nPlease rewrite your answer to be 100% accurate to the source documents. DO NOT hallucinate."))
     response = await llm.ainvoke(messages)
     return response.content
 
-async def verify_and_correct_citations(draft: str, retrieved_context: list) -> str:
+async def verify_citations(draft: str, retrieved_context: list) -> dict:
     # Build context string
     context_parts = []
     for doc in retrieved_context:
@@ -112,9 +114,12 @@ async def verify_and_correct_citations(draft: str, retrieved_context: list) -> s
     
     prompt = f"""You are a strict legal verification AI.
 Read the drafted answer and cross-check it against the provided source documents.
-If the drafted answer contains ANY facts, laws, sections, or citations that do not exist in the source documents (hallucinations), rewrite the answer to remove or correct them.
-If the drafted answer is 100% accurate to the source documents, simply return the drafted answer as is.
-DO NOT add any conversational filler like "Here is the corrected answer:". Just output the final verified text.
+If the drafted answer contains ANY facts, laws, sections, or citations that do not exist in the source documents (hallucinations), you MUST reject it.
+If it is 100% accurate, you MUST pass it.
+
+OUTPUT FORMAT:
+If it passes, output exactly the word: PASS
+If it fails, output exactly the word: FAIL: followed by a short explanation of what was hallucinated so the drafter can fix it.
 
 --- SOURCE DOCUMENTS ---
 {context_text}
@@ -125,7 +130,12 @@ DO NOT add any conversational filler like "Here is the corrected answer:". Just 
     messages = [SystemMessage(content="You are a strict verification AI."), HumanMessage(content=prompt)]
     try:
         response = await llm.ainvoke(messages)
-        return response.content.strip()
+        output = response.content.strip()
+        if output.startswith("PASS"):
+            return {"is_valid": True, "feedback": ""}
+        else:
+            return {"is_valid": False, "feedback": output}
     except Exception as e:
         print(f"Warning: verification failed: {e}")
-        return draft # Fallback to draft if verifier fails
+        # If the verifier crashes, we fail safe and reject.
+        return {"is_valid": False, "feedback": "FAIL: Verifier crashed."}
