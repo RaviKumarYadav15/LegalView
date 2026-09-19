@@ -118,7 +118,7 @@ export default function ChatArea({ sessionId, onMessageSent, token, isDark }) {
       }
       
       const aiMsgId = Date.now() + 1;
-      setMessages(prev => [...prev, { id: aiMsgId, role: 'ai', content: "", sources: [], status: '⏳ Initializing...', isTyping: false }]);
+      setMessages(prev => [...prev, { id: aiMsgId, role: 'ai', content: "", sources: [], status: 'Initializing...', isTyping: false }]);
       
       let receivedChunk = false;
       for await (const { event, data } of parseSSE(res)) {
@@ -181,11 +181,12 @@ export default function ChatArea({ sessionId, onMessageSent, token, isDark }) {
                   <div className="w-full text-ink">
                     <div className="flex items-center gap-3 mb-3">
                       <Scale className={`text-blue-400 ${msg.status ? 'animate-pulse' : ''}`} size={24} />
+                      {msg.status && !msg.content && (
+                        <div className="text-muted text-sm italic animate-pulse tracking-wide">{msg.status}</div>
+                      )}
                     </div>
                     
-                    {msg.status && !msg.content ? (
-                      <div className="text-muted text-sm italic animate-pulse tracking-wide ml-1">{msg.status}</div>
-                    ) : (
+                    {msg.status && !msg.content ? null : (
                       <div className={`prose ${isDark ? 'prose-invert' : ''} max-w-none prose-p:leading-relaxed prose-p:text-[15px] prose-pre:bg-panel prose-pre:border prose-pre:border-line prose-th:text-left prose-th:p-3 prose-th:border-b prose-th:border-line prose-td:p-3 prose-td:border-b prose-td:border-line`}>
                         <ReactMarkdown>{msg.content}</ReactMarkdown>
                         {msg.sources && msg.sources.length > 0 && !msg.isTyping && (

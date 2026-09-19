@@ -64,13 +64,13 @@ async def answer_from_documents(request: QueryRequest, standalone_query: str, ch
         full_answer = cached_data["answer"]
         chunks_data = json.loads(cached_data["sources"])
         
-        yield f"event: status\ndata: ✅ Answer found in Semantic Cache!\n\n"
+        yield f"event: status\ndata: {json.dumps('Answer found in Semantic Cache!')}\n\n"
         await asyncio.sleep(0.01)
         yield f"event: sources\ndata: {cached_data['sources']}\n\n"
         yield f"event: chunk\ndata: {json.dumps(full_answer)}\n\n"
     else:
         # Step 1: Hybrid Search
-        yield f"event: status\ndata: ⏳ Searching Legal Database...\n\n"
+        yield f"event: status\ndata: {json.dumps('Searching Legal Database...')}\n\n"
         await asyncio.sleep(0.01) # Force event loop to flush the status to client!
         
         # Run hybrid_search in a threadpool so it doesn't block the async event loop
@@ -91,17 +91,17 @@ async def answer_from_documents(request: QueryRequest, standalone_query: str, ch
         yield f"event: sources\ndata: {json.dumps(chunks_data)}\n\n"
         
         # Step 2: Draft Answer
-        yield f"event: status\ndata: ⏳ Drafting legal response...\n\n"
+        yield f"event: status\ndata: {json.dumps('Drafting legal response...')}\n\n"
         await asyncio.sleep(0.01) # Force flush
         draft_answer = await generate_draft_answer(request.query, top_chunks, chat_history)
         
         # Step 3: Verify Answer
-        yield f"event: status\ndata: ⏳ Verifying citations and cross-checking facts...\n\n"
+        yield f"event: status\ndata: {json.dumps('Verifying citations and cross-checking facts...')}\n\n"
         await asyncio.sleep(0.01) # Force flush
         full_answer = await verify_and_correct_citations(draft_answer, top_chunks)
         
         # Step 4: Done! Send full chunk
-        yield f"event: status\ndata: ✅ Verified!\n\n"
+        yield f"event: status\ndata: {json.dumps('Verified!')}\n\n"
         await asyncio.sleep(0.01) # Force flush
         yield f"event: chunk\ndata: {json.dumps(full_answer)}\n\n"
         
@@ -145,7 +145,7 @@ async def handle_query(request: QueryRequest, current_user: dict = Depends(get_c
         async def event_generator():
             try:
                 import asyncio
-                yield f"event: status\ndata: ⏳ Analyzing intent...\n\n"
+                yield f"event: status\ndata: {json.dumps('Analyzing intent...')}\n\n"
                 await asyncio.sleep(0.01) # Force flush
                 
                 # Run rewrite_query in a thread to avoid blocking the event loop
