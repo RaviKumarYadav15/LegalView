@@ -95,8 +95,37 @@ def _build_messages(query: str, retrieved_context: list, chat_history: list = No
     )
     return messages
 
-async def generate_answer_stream(query: str, retrieved_context: list, chat_history: list = None):
+async def generate_draft_answer(query: str, retrieved_context: list, chat_history: list = None) -> str:
     messages = _build_messages(query, retrieved_context, chat_history)
-    async for chunk in llm.astream(messages):
-        if chunk.content:
-            yield chunk.content
+    response = await llm.ainvoke(messages)
+    return response.content
+
+async def verify_and_correct_citations(draft: str, retrieved_context: list) -> str:
+    # Build context string
+    context_parts = []
+    for doc in retrieved_context:
+        filename = basename(doc.metadata.get("source", "Unknown Document"))
+        page = doc.metadata.get('page', 0) + 1
+        header = f'--- SOURCE: {filename} (Page {page}) ---'
+        context_parts.append(f'{header}\n{doc.page_content}')
+    context_text = '\n\n'.join(context_parts)
+    
+    prompt = f"""You are a strict legal verification AI.
+Read the drafted answer and cross-check it against the provided source documents.
+If the drafted answer contains ANY facts, laws, sections, or citations that do not exist in the source documents (hallucinations), rewrite the answer to remove or correct them.
+If the drafted answer is 100% accurate to the source documents, simply return the drafted answer as is.
+DO NOT add any conversational filler like "Here is the corrected answer:". Just output the final verified text.
+
+--- SOURCE DOCUMENTS ---
+{context_text}
+
+--- DRAFTED ANSWER ---
+{draft}"""
+    
+    messages = [SystemMessage(content="You are a strict verification AI."), HumanMessage(content=prompt)]
+    try:
+        response = await llm.ainvoke(messages)
+        return response.content.strip()
+    except Exception as e:
+        print(f"Warning: verification failed: {e}")
+        return draft # Fallback to draft if verifier fails

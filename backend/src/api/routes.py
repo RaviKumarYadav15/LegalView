@@ -2,7 +2,7 @@ from fastapi import APIRouter, HTTPException, Depends, Request
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from src.retrieval.hybrid import hybrid_search
-from src.generation.chains import rewrite_query, generate_answer_stream
+from src.generation.chains import rewrite_query, generate_draft_answer, verify_and_correct_citations
 from src.api.auth import get_current_user, db
 from src.api.rate_limiter import SlidingWindowRateLimiter
 from src.core.config import settings
@@ -55,7 +55,7 @@ async def canned_reply(text: str):
     yield f"event: chunk\ndata: {json.dumps(text)}\n\n"
 
 async def answer_from_documents(request: QueryRequest, standalone_query: str, chat_history: list, user_id: str, is_guest: bool):
-    # 1. Check Semantic Cache FIRST (Before slow Hybrid Search)
+    # Check Semantic Cache FIRST
     cached_data = await check_semantic_cache(standalone_query, threshold=0.15)
     
     if cached_data:
@@ -66,7 +66,8 @@ async def answer_from_documents(request: QueryRequest, standalone_query: str, ch
         yield f"event: sources\ndata: {cached_data['sources']}\n\n"
         yield f"event: chunk\ndata: {json.dumps(full_answer)}\n\n"
     else:
-        # Cache Miss: Run Hybrid Search and LLM
+        # Step 1: Hybrid Search
+        yield f"event: status\ndata: ⏳ Searching Legal Database...\n\n"
         top_chunks = hybrid_search(standalone_query)
         
         chunks_data = [
@@ -83,14 +84,21 @@ async def answer_from_documents(request: QueryRequest, standalone_query: str, ch
         
         yield f"event: sources\ndata: {json.dumps(chunks_data)}\n\n"
         
-        full_answer = ""
-        async for chunk in generate_answer_stream(request.query, top_chunks, chat_history):
-            full_answer += chunk
-            yield f"event: chunk\ndata: {json.dumps(chunk)}\n\n"
+        # Step 2: Draft Answer
+        yield f"event: status\ndata: ⏳ Drafting legal response...\n\n"
+        draft_answer = await generate_draft_answer(request.query, top_chunks, chat_history)
+        
+        # Step 3: Verify Answer
+        yield f"event: status\ndata: ⏳ Verifying citations and cross-checking facts...\n\n"
+        full_answer = await verify_and_correct_citations(draft_answer, top_chunks)
+        
+        # Step 4: Done! Send full chunk
+        yield f"event: status\ndata: ✅ Verified!\n\n"
+        yield f"event: chunk\ndata: {json.dumps(full_answer)}\n\n"
         
         # Save both answer AND sources to the cache
         import asyncio
-        print(f'[ROUTES] Saving new answer and sources to Semantic Cache...', flush=True)
+        print(f'[ROUTES] Saving verified answer and sources to Semantic Cache...', flush=True)
         asyncio.create_task(save_to_semantic_cache(standalone_query, full_answer, chunks_data))
 
     # 3. Save this interaction to Redis Chat History (Expire after 1 hour)
