@@ -55,40 +55,43 @@ async def canned_reply(text: str):
     yield f"event: chunk\ndata: {json.dumps(text)}\n\n"
 
 async def answer_from_documents(request: QueryRequest, standalone_query: str, chat_history: list, user_id: str, is_guest: bool):
-    top_chunks = hybrid_search(standalone_query)
+    # 1. Check Semantic Cache FIRST (Before slow Hybrid Search)
+    cached_data = await check_semantic_cache(standalone_query, threshold=0.15)
     
-    chunks_data = [
-        {
-            "id": idx, 
-            "text": chunk.page_content, 
-            "score": chunk.metadata.get("rerank_score", 0.0),
-            "source": basename(chunk.metadata.get("source", "Unknown Document")),
-            "page": chunk.metadata.get("page", 0) + 1,
-            "legal_meta": chunk.metadata.get("legal_meta")
-        } 
-        for idx, chunk in enumerate(top_chunks)
-    ]
-    
-    yield f"event: sources\ndata: {json.dumps(chunks_data)}\n\n"
-    
-    full_answer = ""
-    # Check Semantic Cache using the standalone (rewritten) query
-    cached_answer = await check_semantic_cache(standalone_query, threshold=0.15)
-    
-    if cached_answer:
-        print(f'[ROUTES] Streaming answer directly from cache!', flush=True)
-        full_answer = cached_answer
+    if cached_data:
+        print(f'[ROUTES] Streaming answer and sources directly from cache!', flush=True)
+        full_answer = cached_data["answer"]
+        chunks_data = json.loads(cached_data["sources"])
+        
+        yield f"event: sources\ndata: {cached_data['sources']}\n\n"
         yield f"event: chunk\ndata: {json.dumps(full_answer)}\n\n"
     else:
+        # Cache Miss: Run Hybrid Search and LLM
+        top_chunks = hybrid_search(standalone_query)
+        
+        chunks_data = [
+            {
+                "id": idx, 
+                "text": chunk.page_content, 
+                "score": chunk.metadata.get("rerank_score", 0.0),
+                "source": basename(chunk.metadata.get("source", "Unknown Document")),
+                "page": chunk.metadata.get("page", 0) + 1,
+                "legal_meta": chunk.metadata.get("legal_meta")
+            } 
+            for idx, chunk in enumerate(top_chunks)
+        ]
+        
+        yield f"event: sources\ndata: {json.dumps(chunks_data)}\n\n"
+        
+        full_answer = ""
         async for chunk in generate_answer_stream(request.query, top_chunks, chat_history):
             full_answer += chunk
             yield f"event: chunk\ndata: {json.dumps(chunk)}\n\n"
         
-        # Save to semantic cache in background (without blocking response)
-        # We save the standalone_query, since it has resolved context (e.g., "What is murder?" instead of "What is it?")
+        # Save both answer AND sources to the cache
         import asyncio
-        print(f'[ROUTES] Saving new answer to Semantic Cache...', flush=True)
-        asyncio.create_task(save_to_semantic_cache(standalone_query, full_answer))
+        print(f'[ROUTES] Saving new answer and sources to Semantic Cache...', flush=True)
+        asyncio.create_task(save_to_semantic_cache(standalone_query, full_answer, chunks_data))
 
     # 3. Save this interaction to Redis Chat History (Expire after 1 hour)
     history_key = f"chat_history:{user_id}:{request.session_id}"

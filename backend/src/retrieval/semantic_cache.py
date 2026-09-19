@@ -56,7 +56,7 @@ async def check_semantic_cache(query: str, threshold: float = 0.15):
         q = (
             Query("*=>[KNN 1 @vector $vec_param AS vector_score]")
             .sort_by("vector_score")
-            .return_fields("query", "answer", "vector_score")
+            .return_fields("query", "answer", "sources", "vector_score")
             .paging(0, 1)
             .dialect(2)
         )
@@ -73,14 +73,23 @@ async def check_semantic_cache(query: str, threshold: float = 0.15):
                 print(f'[SEMANTIC CACHE] HIT! Bypassing LLM.', flush=True)
                 answer = doc.answer
                 if isinstance(answer, bytes):
-                    return answer.decode('utf-8')
-                return answer
+                    answer = answer.decode('utf-8')
+                
+                # Fetch sources (if it's an old cached key, it might not have sources)
+                sources_str = "[]"
+                if hasattr(doc, 'sources') and doc.sources:
+                    sources_str = doc.sources
+                    if isinstance(sources_str, bytes):
+                        sources_str = sources_str.decode('utf-8')
+                        
+                return {"answer": answer, "sources": sources_str}
     except Exception as e:
         print(f"Semantic Cache check error: {e}")
         
     return None
 
-async def save_to_semantic_cache(query: str, answer: str, ttl_seconds: int = 2592000):
+import json
+async def save_to_semantic_cache(query: str, answer: str, sources: list, ttl_seconds: int = 2592000):
     """
     Saves a query and its answer into Redis with a TTL of 30 days.
     """
@@ -93,6 +102,7 @@ async def save_to_semantic_cache(query: str, answer: str, ttl_seconds: int = 259
         mapping = {
             "query": query.encode('utf-8'),
             "answer": answer.encode('utf-8'),
+            "sources": json.dumps(sources).encode('utf-8'),
             "vector": vector_bytes
         }
         
