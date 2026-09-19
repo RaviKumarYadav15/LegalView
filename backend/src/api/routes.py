@@ -96,11 +96,11 @@ async def answer_from_documents(request: QueryRequest, standalone_query: str, ch
         feedback = None
         
         for attempt in range(3):
-            yield f"event: status\ndata: {json.dumps(f'Drafting legal response... (Attempt {attempt+1}/3)')}\n\n"
+            yield f"event: status\ndata: {json.dumps('Drafting legal response...')}\n\n"
             await asyncio.sleep(0.01)
             draft_answer = await generate_draft_answer(request.query, top_chunks, chat_history, feedback)
             
-            yield f"event: status\ndata: {json.dumps(f'Verifying citations... (Attempt {attempt+1}/3)')}\n\n"
+            yield f"event: status\ndata: {json.dumps('Verifying citations and cross-checking facts...')}\n\n"
             await asyncio.sleep(0.01)
             verification = await verify_citations(draft_answer, top_chunks)
             
