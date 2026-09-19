@@ -55,6 +55,7 @@ async def canned_reply(text: str):
     yield f"event: chunk\ndata: {json.dumps(text)}\n\n"
 
 async def answer_from_documents(request: QueryRequest, standalone_query: str, chat_history: list, user_id: str, is_guest: bool):
+    import asyncio
     # Check Semantic Cache FIRST
     cached_data = await check_semantic_cache(standalone_query, threshold=0.15)
     
@@ -63,12 +64,17 @@ async def answer_from_documents(request: QueryRequest, standalone_query: str, ch
         full_answer = cached_data["answer"]
         chunks_data = json.loads(cached_data["sources"])
         
+        yield f"event: status\ndata: ✅ Answer found in Semantic Cache!\n\n"
+        await asyncio.sleep(0.01)
         yield f"event: sources\ndata: {cached_data['sources']}\n\n"
         yield f"event: chunk\ndata: {json.dumps(full_answer)}\n\n"
     else:
         # Step 1: Hybrid Search
         yield f"event: status\ndata: ⏳ Searching Legal Database...\n\n"
-        top_chunks = hybrid_search(standalone_query)
+        await asyncio.sleep(0.01) # Force event loop to flush the status to client!
+        
+        # Run hybrid_search in a threadpool so it doesn't block the async event loop
+        top_chunks = await asyncio.to_thread(hybrid_search, standalone_query)
         
         chunks_data = [
             {
@@ -86,18 +92,19 @@ async def answer_from_documents(request: QueryRequest, standalone_query: str, ch
         
         # Step 2: Draft Answer
         yield f"event: status\ndata: ⏳ Drafting legal response...\n\n"
+        await asyncio.sleep(0.01) # Force flush
         draft_answer = await generate_draft_answer(request.query, top_chunks, chat_history)
         
         # Step 3: Verify Answer
         yield f"event: status\ndata: ⏳ Verifying citations and cross-checking facts...\n\n"
+        await asyncio.sleep(0.01) # Force flush
         full_answer = await verify_and_correct_citations(draft_answer, top_chunks)
         
         # Step 4: Done! Send full chunk
         yield f"event: status\ndata: ✅ Verified!\n\n"
+        await asyncio.sleep(0.01) # Force flush
         yield f"event: chunk\ndata: {json.dumps(full_answer)}\n\n"
         
-        # Save both answer AND sources to the cache
-        import asyncio
         print(f'[ROUTES] Saving verified answer and sources to Semantic Cache...', flush=True)
         asyncio.create_task(save_to_semantic_cache(standalone_query, full_answer, chunks_data))
 
@@ -134,10 +141,16 @@ async def handle_query(request: QueryRequest, current_user: dict = Depends(get_c
         is_guest = current_user["is_guest"]
         
         history = await load_history(user_id, request.session_id)
-        standalone_query = rewrite_query(request.query, history)
 
         async def event_generator():
             try:
+                import asyncio
+                yield f"event: status\ndata: ⏳ Analyzing intent...\n\n"
+                await asyncio.sleep(0.01) # Force flush
+                
+                # Run rewrite_query in a thread to avoid blocking the event loop
+                standalone_query = await asyncio.to_thread(rewrite_query, request.query, history)
+                
                 if is_greeting(standalone_query):
                     answer = "Hello! I am LegalView, your AI legal assistant. How can I help you today?"
                     async for evt in canned_reply(answer): yield evt
