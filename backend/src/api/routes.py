@@ -4,7 +4,7 @@ from pydantic import BaseModel
 from src.retrieval.hybrid import hybrid_search
 from src.generation.chains import rewrite_query, generate_answer_stream
 from src.api.auth import get_current_user, db
-from fastapi_limiter.depends import RateLimiter
+from src.api.rate_limiter import SlidingWindowRateLimiter
 from src.core.config import settings
 from src.core.utils import basename
 import redis
@@ -113,7 +113,7 @@ async def answer_from_documents(request: QueryRequest, standalone_query: str, ch
 
         await doc_ref.set(session_metadata, merge=True)
 
-@router.post("/query", dependencies=[Depends(RateLimiter(times=10, seconds=60))])
+@router.post("/query", dependencies=[Depends(SlidingWindowRateLimiter(times=10, seconds=60))])
 async def handle_query(request: QueryRequest, current_user: dict = Depends(get_current_user)):
     try:
         user_id = current_user["user_id"]
