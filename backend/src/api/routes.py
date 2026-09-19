@@ -6,6 +6,7 @@ from src.generation.chains import rewrite_query, generate_answer_stream
 from src.api.auth import get_current_user, db
 from src.api.rate_limiter import SlidingWindowRateLimiter
 from src.core.config import settings
+from src.retrieval.semantic_cache import check_semantic_cache, save_to_semantic_cache
 from src.core.utils import basename
 import redis
 import json
@@ -71,11 +72,8 @@ async def answer_from_documents(request: QueryRequest, standalone_query: str, ch
     yield f"event: sources\ndata: {json.dumps(chunks_data)}\n\n"
     
     full_answer = ""
-    cache_content_string = request.query + json.dumps(chat_history) + json.dumps(chunks_data)
-    query_hash = hashlib.md5(cache_content_string.encode('utf-8')).hexdigest()
-    cache_key = f"llm_cache:{query_hash}"
-    
-    cached_answer = await redis_client.get(cache_key)
+    # Check Semantic Cache using the standalone (rewritten) query
+    cached_answer = await check_semantic_cache(standalone_query, threshold=0.05)
     
     if cached_answer:
         full_answer = cached_answer
@@ -85,7 +83,10 @@ async def answer_from_documents(request: QueryRequest, standalone_query: str, ch
             full_answer += chunk
             yield f"event: chunk\ndata: {json.dumps(chunk)}\n\n"
         
-        await redis_client.setex(cache_key, 86400, full_answer)
+        # Save to semantic cache in background (without blocking response)
+        # We save the standalone_query, since it has resolved context (e.g., "What is murder?" instead of "What is it?")
+        import asyncio
+        asyncio.create_task(save_to_semantic_cache(standalone_query, full_answer))
 
     # 3. Save this interaction to Redis Chat History (Expire after 1 hour)
     history_key = f"chat_history:{user_id}:{request.session_id}"

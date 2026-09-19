@@ -1,8 +1,16 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from src.api.routes import router
+from src.retrieval.semantic_cache import init_redis_semantic_index
+from contextlib import asynccontextmanager
 
-app = FastAPI(title="Standard RAG API")
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Initialize Redis Semantic Cache index
+    await init_redis_semantic_index()
+    yield
+
+app = FastAPI(title="Standard RAG API", lifespan=lifespan)
 
 # Allow the React frontend to talk to the FastAPI backend
 app.add_middleware(
