@@ -68,14 +68,15 @@ export default function ChatArea({ sessionId, onMessageSent, token, isDark }) {
 
   const simulateTyping = (msgId, fullText) => {
     let i = 0;
-    setStatusText('');
+    setMessages(prev => prev.map(m => m.id === msgId ? { ...m, status: null, isTyping: true } : m));
+    
     const interval = setInterval(() => {
-      // Type 4 characters at a time for a fast, snappy feel
       const charsToAdd = fullText.slice(i, i + 4);
       setMessages(prev => prev.map(m => m.id === msgId ? { ...m, content: m.content + charsToAdd } : m));
       i += 4;
       if (i >= fullText.length) {
         clearInterval(interval);
+        setMessages(prev => prev.map(m => m.id === msgId ? { ...m, isTyping: false } : m));
         setLoading(false);
       }
     }, 15);
@@ -117,18 +118,16 @@ export default function ChatArea({ sessionId, onMessageSent, token, isDark }) {
       }
       
       const aiMsgId = Date.now() + 1;
-      setMessages(prev => [...prev, { id: aiMsgId, role: 'ai', content: "", sources: [] }]);
-      setStatusText('⏳ Generating...'); // Default fallback
+      setMessages(prev => [...prev, { id: aiMsgId, role: 'ai', content: "", sources: [], status: '⏳ Initializing...', isTyping: false }]);
       
       let receivedChunk = false;
       for await (const { event, data } of parseSSE(res)) {
         if (event === 'status') {
-          setStatusText(data);
+          setMessages(prev => prev.map(m => m.id === aiMsgId ? { ...m, status: data } : m));
         } else if (event === 'sources') {
           setMessages(prev => prev.map(m => m.id === aiMsgId ? { ...m, sources: data } : m));
         } else if (event === 'chunk') {
           receivedChunk = true;
-          // We got the massive string, simulate typing!
           simulateTyping(aiMsgId, data);
         }
       }
@@ -181,32 +180,25 @@ export default function ChatArea({ sessionId, onMessageSent, token, isDark }) {
                 ) : (
                   <div className="w-full text-ink">
                     <div className="flex items-center gap-3 mb-3">
-                      <Scale className="text-blue-400" size={24} />
+                      <Scale className={`text-blue-400 ${msg.status ? 'animate-pulse' : ''}`} size={24} />
                     </div>
-                    <div className={`prose ${isDark ? 'prose-invert' : ''} max-w-none prose-p:leading-relaxed prose-p:text-[15px] prose-pre:bg-panel prose-pre:border prose-pre:border-line prose-th:text-left prose-th:p-3 prose-th:border-b prose-th:border-line prose-td:p-3 prose-td:border-b prose-td:border-line`}>
-                      <ReactMarkdown>{msg.content}</ReactMarkdown>
-                      <CitationAccordion sources={msg.sources} />
-                    </div>
+                    
+                    {msg.status && !msg.content ? (
+                      <div className="text-muted text-sm italic animate-pulse tracking-wide ml-1">{msg.status}</div>
+                    ) : (
+                      <div className={`prose ${isDark ? 'prose-invert' : ''} max-w-none prose-p:leading-relaxed prose-p:text-[15px] prose-pre:bg-panel prose-pre:border prose-pre:border-line prose-th:text-left prose-th:p-3 prose-th:border-b prose-th:border-line prose-td:p-3 prose-td:border-b prose-td:border-line`}>
+                        <ReactMarkdown>{msg.content}</ReactMarkdown>
+                        {msg.sources && msg.sources.length > 0 && !msg.isTyping && (
+                          <div className="mt-4">
+                            <CitationAccordion sources={msg.sources} />
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
             ))}
-            {loading && (
-              <div className="flex flex-col items-start w-full">
-                <div className="flex items-center gap-3 mb-2">
-                  <Scale className="text-blue-400 animate-pulse" size={24} />
-                </div>
-                {statusText ? (
-                  <div className="text-muted text-sm px-2 py-2 italic animate-pulse">{statusText}</div>
-                ) : (
-                  <div className="flex gap-1 items-center px-2 py-4">
-                    <span className="w-2 h-2 bg-gray-500 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></span>
-                    <span className="w-2 h-2 bg-gray-500 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></span>
-                    <span className="w-2 h-2 bg-gray-500 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></span>
-                  </div>
-                )}
-              </div>
-            )}
             <div ref={messagesEndRef} />
           </div>
         )}
