@@ -114,3 +114,18 @@ async def save_to_semantic_cache(query: str, answer: str, sources: list, ttl_sec
         await redis_cache_client.expire(doc_id, ttl_seconds)
     except Exception as e:
         print(f"Semantic Cache save error: {e}")
+
+async def clear_semantic_cache():
+    """
+    Wipes all cached semantic answers. 
+    Call this whenever new documents are ingested to prevent serving stale data.
+    """
+    try:
+        keys = await redis_cache_client.keys(f"{PREFIX}*")
+        if keys:
+            await redis_cache_client.delete(*keys)
+            print(f"[SEMANTIC CACHE] Successfully wiped {len(keys)} outdated answers from Redis.")
+        else:
+            print(f"[SEMANTIC CACHE] Cache is already empty, nothing to clear.")
+    except Exception as e:
+        print(f"Error clearing semantic cache: {e}")

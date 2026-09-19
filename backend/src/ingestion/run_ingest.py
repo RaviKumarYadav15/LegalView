@@ -48,6 +48,12 @@ def run_ingestion():
         pickle.dump({"bm25": bm25, "documents": all_chunks}, f)
         
     print("Ingestion complete!")
+    
+    # 4. Clear the Semantic Cache
+    print("Clearing outdated semantic cache from Redis...")
+    import asyncio
+    from src.retrieval.semantic_cache import clear_semantic_cache
+    asyncio.run(clear_semantic_cache())
 
 if __name__ == "__main__":
     run_ingestion()
