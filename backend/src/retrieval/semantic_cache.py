@@ -71,6 +71,10 @@ async def check_semantic_cache(query: str, threshold: float = 0.15):
             print(f'[SEMANTIC CACHE] Closest match distance: {score} (Threshold: {threshold})', flush=True)
             if score <= threshold:
                 print(f'[SEMANTIC CACHE] HIT! Bypassing LLM.', flush=True)
+                
+                # Renew the TTL for 3 days (259200 seconds) on every cache hit
+                await redis_cache_client.expire(doc.id, 259200)
+                
                 answer = doc.answer
                 if isinstance(answer, bytes):
                     answer = answer.decode('utf-8')
@@ -89,9 +93,9 @@ async def check_semantic_cache(query: str, threshold: float = 0.15):
     return None
 
 import json
-async def save_to_semantic_cache(query: str, answer: str, sources: list, ttl_seconds: int = 2592000):
+async def save_to_semantic_cache(query: str, answer: str, sources: list, ttl_seconds: int = 259200):
     """
-    Saves a query and its answer into Redis with a TTL of 30 days.
+    Saves a query and its answer into Redis with a TTL of 3 days.
     """
     try:
         query_vector = embeddings.embed_query(query)
