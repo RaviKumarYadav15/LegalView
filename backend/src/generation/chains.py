@@ -7,11 +7,12 @@ from src.core.config import settings
 # By changing the base_url, we can use Langchain's robust OpenAI integration to access 
 # hundreds of different open source and proprietary models.
 
+import os
 llm = ChatOpenAI(
-    openai_api_key=settings.openrouter_api_key,
+    openai_api_key=os.getenv("OPENROUTER_API_KEY", settings.openrouter_api_key), 
     openai_api_base="https://openrouter.ai/api/v1",
-    model_name="openrouter/free", # Automatically routes to best available free model
-    max_tokens=4000,
+    model_name="nvidia/nemotron-3-nano-omni:free", # Swapped to the NVIDIA model
+    max_tokens=3000,
 )
 
 RAG_SYSTEM_PROMPT = """You are an expert Indian legal assistant.
