@@ -129,6 +129,8 @@ export default function ChatArea({ sessionId, onMessageSent, token, isDark }) {
         } else if (event === 'chunk') {
           receivedChunk = true;
           simulateTyping(aiMsgId, data);
+        } else if (event === 'error') {
+          setMessages(prev => prev.map(m => m.id === aiMsgId ? { ...m, status: null, content: `Backend Error: ${data}` } : m));
         }
       }
       
