@@ -11,7 +11,7 @@ import os
 llm = ChatOpenAI(
     openai_api_key=os.getenv("OPENROUTER_API_KEY", settings.openrouter_api_key), 
     openai_api_base="https://openrouter.ai/api/v1",
-    model_name="nvidia/nemotron-3-nano-omni:free", # Swapped to the NVIDIA model
+    model_name="openrouter/free", # Automatically routes to best available free model
     max_tokens=3000,
 )
 
