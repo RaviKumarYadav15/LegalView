@@ -106,7 +106,21 @@ def _build_messages(query: str, retrieved_context: list, chat_history: list = No
 
 async def generate_draft_answer(query: str, retrieved_context: list, chat_history: list = None) -> str:
     messages = _build_messages(query, retrieved_context, chat_history)
-    response = await llm.ainvoke(messages)
-    return response.content
+    
+    max_retries = 3
+    for attempt in range(max_retries):
+        response = await llm.ainvoke(messages)
+        content = response.content.strip()
+        
+        # Free models (like Gemini) sometimes block legal queries incorrectly and output this exact phrase
+        if content == "User Safety: safe" or "User Safety: safe" in content:
+            print(f"Warning: Model blocked query due to safety filter (Attempt {attempt+1}/{max_retries})")
+            if attempt == max_retries - 1:
+                raise Exception("The randomly selected free AI model blocked the query due to a false-positive safety filter. Please try asking your question again to route to a different model.")
+            continue # Try again (OpenRouter will likely pick a different free model)
+            
+        return content
+        
+    return ""
 
 
