@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Scale, Send, BookOpen, Shield, Zap } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import CitationAccordion from './CitationAccordion';
 import { parseSSE } from '../utils/parseSSE';
 import { auth } from '../firebase';
@@ -190,7 +191,7 @@ export default function ChatArea({ sessionId, onMessageSent, token, isDark }) {
                     
                     {msg.status && !msg.content ? null : (
                       <div className={`prose ${isDark ? 'prose-invert' : ''} max-w-none prose-p:leading-relaxed prose-p:text-[15px] prose-pre:bg-panel prose-pre:border prose-pre:border-line prose-th:text-left prose-th:p-3 prose-th:border-b prose-th:border-line prose-td:p-3 prose-td:border-b prose-td:border-line`}>
-                        <ReactMarkdown>{msg.content}</ReactMarkdown>
+                        <ReactMarkdown remarkPlugins={[remarkGfm]}>{msg.content}</ReactMarkdown>
                         {msg.sources && msg.sources.length > 0 && !msg.isTyping && (
                           <div className="mt-4">
                             <CitationAccordion sources={msg.sources} />
