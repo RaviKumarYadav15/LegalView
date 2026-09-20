@@ -95,47 +95,9 @@ def _build_messages(query: str, retrieved_context: list, chat_history: list = No
     )
     return messages
 
-async def generate_draft_answer(query: str, retrieved_context: list, chat_history: list = None, feedback: str = None) -> str:
+async def generate_draft_answer(query: str, retrieved_context: list, chat_history: list = None) -> str:
     messages = _build_messages(query, retrieved_context, chat_history)
-    if feedback:
-        messages.append(HumanMessage(content=f"Your previous attempt was rejected by the verifier with this feedback:\n\n{feedback}\n\nPlease rewrite your answer to be 100% accurate to the source documents. DO NOT hallucinate."))
     response = await llm.ainvoke(messages)
     return response.content
 
-async def verify_citations(draft: str, retrieved_context: list) -> dict:
-    # Build context string
-    context_parts = []
-    for doc in retrieved_context:
-        filename = basename(doc.metadata.get("source", "Unknown Document"))
-        page = doc.metadata.get('page', 0) + 1
-        header = f'--- SOURCE: {filename} (Page {page}) ---'
-        context_parts.append(f'{header}\n{doc.page_content}')
-    context_text = '\n\n'.join(context_parts)
-    
-    prompt = f"""You are a strict legal verification AI.
-Read the drafted answer and cross-check it against the provided source documents.
-If the drafted answer contains ANY facts, laws, sections, or citations that do not exist in the source documents (hallucinations), you MUST reject it.
-If it is 100% accurate, you MUST pass it.
 
-OUTPUT FORMAT:
-If it passes, output exactly the word: PASS
-If it fails, output exactly the word: FAIL: followed by a short explanation of what was hallucinated so the drafter can fix it.
-
---- SOURCE DOCUMENTS ---
-{context_text}
-
---- DRAFTED ANSWER ---
-{draft}"""
-    
-    messages = [SystemMessage(content="You are a strict verification AI."), HumanMessage(content=prompt)]
-    try:
-        response = await llm.ainvoke(messages)
-        output = response.content.strip()
-        if output.startswith("PASS"):
-            return {"is_valid": True, "feedback": ""}
-        else:
-            return {"is_valid": False, "feedback": output}
-    except Exception as e:
-        print(f"Warning: verification failed: {e}")
-        # If the verifier crashes, we fail safe and reject.
-        return {"is_valid": False, "feedback": "FAIL: Verifier crashed."}

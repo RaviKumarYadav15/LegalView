@@ -2,7 +2,7 @@ from fastapi import APIRouter, HTTPException, Depends, Request
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from src.retrieval.hybrid import hybrid_search
-from src.generation.chains import rewrite_query, generate_draft_answer, verify_citations
+from src.generation.chains import rewrite_query, generate_draft_answer
 from src.api.auth import get_current_user, db
 from src.api.rate_limiter import SlidingWindowRateLimiter
 from src.core.config import settings
@@ -90,43 +90,17 @@ async def answer_from_documents(request: QueryRequest, standalone_query: str, ch
         
         yield f"event: sources\ndata: {json.dumps(chunks_data)}\n\n"
         
-        # Step 2 & 3: Draft and Verify (Retry Loop)
-        draft_answer = ""
-        is_valid = False
-        feedback = None
+        # Step 2: Draft Answer
+        yield f"event: status\ndata: {json.dumps('Drafting legal response...')}\n\n"
+        await asyncio.sleep(0.01)
+        full_answer = await generate_draft_answer(request.query, top_chunks, chat_history)
         
-        for attempt in range(3):
-            yield f"event: status\ndata: {json.dumps('Drafting legal response...')}\n\n"
-            await asyncio.sleep(0.01)
-            draft_answer = await generate_draft_answer(request.query, top_chunks, chat_history, feedback)
-            
-            yield f"event: status\ndata: {json.dumps('Verifying citations and cross-checking facts...')}\n\n"
-            await asyncio.sleep(0.01)
-            verification = await verify_citations(draft_answer, top_chunks)
-            
-            if verification["is_valid"]:
-                is_valid = True
-                break
-            else:
-                feedback = verification["feedback"]
-                print(f"[ROUTES] Attempt {attempt+1} Failed: {feedback}", flush=True)
-
-        if is_valid:
-            full_answer = draft_answer
-            yield f"event: status\ndata: {json.dumps('Verified!')}\n\n"
-        else:
-            full_answer = "I apologize, but I could not find a verifiable answer to this in your documents. I have refused to answer to prevent hallucinating incorrect legal information."
-            yield f"event: status\ndata: {json.dumps('Verification Failed.')}\n\n"
-            chunks_data = []
-            yield f"event: sources\ndata: []\n\n"
-
+        yield f"event: status\ndata: {json.dumps('Done!')}\n\n"
         await asyncio.sleep(0.01)
         yield f"event: chunk\ndata: {json.dumps(full_answer)}\n\n"
         
-        # Only cache if valid!
-        if is_valid:
-            print(f'[ROUTES] Saving verified answer and sources to Semantic Cache...', flush=True)
-            asyncio.create_task(save_to_semantic_cache(standalone_query, full_answer, chunks_data))
+        print(f'[ROUTES] Saving answer and sources to Semantic Cache...', flush=True)
+        asyncio.create_task(save_to_semantic_cache(standalone_query, full_answer, chunks_data))
 
     # 3. Save this interaction to Redis Chat History (Expire after 1 hour)
     history_key = f"chat_history:{user_id}:{request.session_id}"
