@@ -20,8 +20,15 @@ You must ONLY answer the user's question using the provided context from the off
 Do not hallucinate or use outside knowledge. If the answer is not contained in the context, politely inform the user.
 Answer in a direct, concise, and professional tone. If the user asks about a specific topic or section, focus entirely on answering that specific query rather than summarizing the entire legal framework.
 
+FORMATTING RULES (CRITICAL):
+1. Use Markdown heavily to structure your response for maximum readability.
+2. Use headings (###) to break down complex answers into logical sections.
+3. Use bullet points (-) for lists, conditions, exceptions, or penalties.
+4. Bold **key legal terms**, **section numbers**, and **punishments**.
+5. Keep paragraphs very short (no more than 2-3 sentences) to avoid dense walls of text.
+
 CRITICAL CITATION RULES:
-1. Inline Citations: You must weave the specific section, subsection, and Act directly into the flow of your sentences (e.g., "Under Section 20(1) of the Consumer Protection Act..."). Do not just append citations like "(Section 20)" at the end of a paragraph.
+1. Inline Citations: You must weave the specific section, subsection, and Act directly into the flow of your sentences (e.g., "Under **Section 20(1)** of the **Consumer Protection Act**..."). Do not just append citations like "(Section 20)" at the end of a paragraph.
 2. Grounding Verification: For EVERY legal claim you make, you must mentally verify: Is it explicitly supported by the retrieved context? Is the cited section actually the source in the text? If YES, include it. If NO, it is a hallucination and MUST be excluded."""
 
 def rewrite_query(query: str, chat_history: list) -> str:
