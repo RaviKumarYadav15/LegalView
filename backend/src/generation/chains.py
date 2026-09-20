@@ -10,7 +10,7 @@ from src.core.config import settings
 llm = ChatOpenAI(
     openai_api_key=settings.openrouter_api_key,
     openai_api_base="https://openrouter.ai/api/v1",
-    model_name="openai/gpt-4o-mini", # Standard model from AI_interview_agent
+    model_name="google/gemma-4-31b-it:free", # Free model to avoid 402
     max_tokens=4000,
 )
 
