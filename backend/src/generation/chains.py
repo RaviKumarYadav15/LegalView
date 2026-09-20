@@ -9,11 +9,10 @@ from src.core.config import settings
 
 import os
 llm = ChatOpenAI(
-    openai_api_key=os.getenv("OPENROUTER_API_KEY", settings.openrouter_api_key), 
+    openai_api_key=os.getenv("OPENROUTER_API_KEY", settings.openrouter_api_key),
     openai_api_base="https://openrouter.ai/api/v1",
-    model_name="nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free", # Corrected Model ID
-    temperature=0.1,   
-    max_tokens=3000,    
+    model_name="openrouter/free", # Bypasses overloaded models automatically
+    max_tokens=3000,
 )
 
 RAG_SYSTEM_PROMPT = """You are an expert Indian legal assistant.
