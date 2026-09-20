@@ -11,6 +11,7 @@ llm = ChatOpenAI(
     openai_api_key=settings.openrouter_api_key,
     openai_api_base="https://openrouter.ai/api/v1",
     model_name="openai/gpt-4o-mini", # Standard model from AI_interview_agent
+    max_tokens=4000,
 )
 
 RAG_SYSTEM_PROMPT = """You are an expert Indian legal assistant.
